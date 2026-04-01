@@ -1,0 +1,26 @@
+{
+  "name": "heyclaude",
+  "version": "0.1.0",
+  "description": "Animated Claude Code mascot in your tmux terminal",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev:daemon": "tsx src/daemon.ts",
+    "dev:render": "tsx src/render-loop.ts",
+    "start": "node dist/cli.js"
+  },
+  "bin": {
+    "heyclaude": "./bin/heyclaude.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.11.0",
+    "@types/ws": "^8.5.10",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}
