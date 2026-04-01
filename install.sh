@@ -23,10 +23,14 @@ echo ""
 echo "▶ Building TypeScript..."
 npm run build
 
-# ── 3. Link CLI globally ───────────────────────────────────────────────────────
+# ── 3. Link CLI to ~/.local/bin (no sudo needed) ──────────────────────────────
 echo ""
-echo "▶ Linking heyclaude CLI..."
-npm link 2>/dev/null || true
+echo "▶ Linking heyclaude CLI to ~/.local/bin..."
+mkdir -p "$HOME/.local/bin"
+ln -sf "$SCRIPT_DIR/bin/heyclaude.js" "$HOME/.local/bin/heyclaude"
+chmod +x "$HOME/.local/bin/heyclaude"
+# Ensure ~/.local/bin is in PATH for this session
+export PATH="$HOME/.local/bin:$PATH"
 
 # ── 4. Create plugin directory ────────────────────────────────────────────────
 echo ""
