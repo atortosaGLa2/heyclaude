@@ -4,6 +4,11 @@ import { octopus }  from './octopus.js';
 import { bunny }    from './bunny.js';
 import { cat }      from './cat.js';
 import { owl }      from './owl.js';
+import { fox }      from './fox.js';
+import { penguin }  from './penguin.js';
+import { dragon }   from './dragon.js';
+import { robot }    from './robot.js';
+import { panda }    from './panda.js';
 import { fallback } from './fallback.js';
 
 export type { Sprite };
@@ -16,10 +21,20 @@ const REGISTRY: Record<string, Sprite> = {
   cat,
   kitten: cat,
   owl,
+  fox,
+  penguin,
+  dragon,
+  robot,
+  panda,
 };
 
-/** All animal names from the Claude Code wordlist that map to custom sprites */
+/** All animal names that map to custom sprites */
 export const SUPPORTED_ANIMALS = Object.keys(REGISTRY);
+
+/** Get all sprites (for web UI / export) */
+export function getAllSprites(): Record<string, Sprite> {
+  return { ...REGISTRY, claude: fallback };
+}
 
 /** Get the sprite for the given animal name, falling back to the Claude mascot */
 export function getSprite(animal: string): Sprite {

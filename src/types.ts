@@ -11,7 +11,9 @@ export type AnimationState =
   | 'success'
   | 'error'
   | 'mcp'
-  | 'skill';
+  | 'skill'
+  | 'sleeping'
+  | 'greeting';
 
 export interface HookEvent {
   state: AnimationState;

@@ -1,13 +1,15 @@
 {
   "name": "heyclaude",
-  "version": "0.1.0",
-  "description": "Animated Claude Code mascot in your tmux terminal",
+  "version": "1.0.0",
+  "description": "Animated pixel-art mascot for Claude Code — reacts to your coding in real time",
   "type": "module",
   "scripts": {
     "build": "tsc",
     "dev:daemon": "tsx src/daemon.ts",
     "dev:render": "tsx src/render-loop.ts",
-    "start": "node dist/cli.js"
+    "start": "node dist/cli.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "bin": {
     "heyclaude": "./bin/heyclaude.js"
@@ -21,6 +23,7 @@
     "@types/node": "^20.11.0",
     "@types/ws": "^8.5.10",
     "tsx": "^4.7.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^3.0.0"
   }
 }

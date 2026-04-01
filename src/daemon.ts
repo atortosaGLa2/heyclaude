@@ -10,14 +10,25 @@
 import express from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
 import { detectAnimal } from './session.js';
-import { hookEventToState, STATE_TIMEOUTS } from './states.js';
+import { hookEventToState, STATE_TIMEOUTS, FRAME_SPEED, STATE_LABELS } from './states.js';
+import { getAllSprites } from './sprites/index.js';
 import type { DaemonState, AnimationState } from './types.js';
 
-export const HTTP_PORT = 7337;
-export const WS_PORT   = 7338;
+const HTTP_PORT = parseInt(process.env.HEYCLAUDE_DAEMON_PORT ?? '7337', 10);
+const WS_PORT   = parseInt(process.env.HEYCLAUDE_WS_PORT ?? '7338', 10);
+const WEB_PORT  = parseInt(process.env.HEYCLAUDE_WEB_PORT ?? '7339', 10);
+
+export { HTTP_PORT, WS_PORT };
 
 const app = express();
 app.use(express.json());
+
+// CORS: allow the web UI to call the daemon API
+app.use((_req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  next();
+});
 
 const wss = new WebSocketServer({ port: WS_PORT });
 const clients = new Set<WebSocket>();
@@ -29,11 +40,18 @@ const { animal, sessionId } = detectAnimal();
 const daemonState: DaemonState = {
   animal,
   sessionId,
-  state: 'idle',
-  label: '',
+  state: 'greeting',
+  label: 'hey!',
 };
 
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Auto-transition from greeting to idle after 3s
+setTimeout(() => {
+  if (daemonState.state === 'greeting') {
+    setState('idle', '');
+  }
+}, 3000);
 
 function setState(state: AnimationState, label = '') {
   daemonState.state = state;
@@ -64,7 +82,6 @@ function broadcast() {
 
 wss.on('connection', (ws) => {
   clients.add(ws);
-  // Send current state immediately on connect
   ws.send(JSON.stringify(daemonState));
   ws.on('close', () => clients.delete(ws));
   ws.on('error', () => clients.delete(ws));
@@ -72,12 +89,6 @@ wss.on('connection', (ws) => {
 
 // ── HTTP API ──────────────────────────────────────────────────────────────────
 
-/**
- * POST /event
- * Body: { event: string, tool?: string, label?: string }
- *
- * Called by Claude Code hooks (pre-tool.js, post-tool.js, prompt.js)
- */
 app.post('/event', (req, res) => {
   const { event, tool, label } = req.body ?? {};
   const state = hookEventToState(event ?? 'PreToolUse', tool);
@@ -85,9 +96,21 @@ app.post('/event', (req, res) => {
   res.json({ ok: true, animal: daemonState.animal, state });
 });
 
-/** GET /status — health check + current state */
 app.get('/status', (_req, res) => {
   res.json(daemonState);
+});
+
+app.get('/sprites', (_req, res) => {
+  res.json({
+    sprites: getAllSprites(),
+    frameSpeeds: FRAME_SPEED,
+    stateLabels: STATE_LABELS,
+  });
+});
+
+app.post('/stop', (_req, res) => {
+  res.json({ ok: true });
+  setTimeout(() => process.exit(0), 100);
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────
@@ -97,3 +120,13 @@ app.listen(HTTP_PORT, () => {
     `[heyclaude] daemon running · animal=${animal} · http=:${HTTP_PORT} · ws=:${WS_PORT}\n`
   );
 });
+
+// ── Web UI (optional, started via HEYCLAUDE_WEB=1 env) ───────────────────────
+
+if (process.env.HEYCLAUDE_WEB === '1') {
+  import('./web/server.js')
+    .then(({ startWebServer }) => startWebServer(WEB_PORT))
+    .catch(() => {
+      process.stderr.write('[heyclaude] web UI module not available\n');
+    });
+}

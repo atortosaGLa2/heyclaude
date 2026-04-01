@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>heyclaude</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #1a1a2e;
+    --bg-card: #16213e;
+    --accent: #e94560;
+    --text: #eee;
+    --text-dim: #8892a4;
+    --success: #4ade80;
+    --error: #f87171;
+    --glow: rgba(233, 69, 96, 0.35);
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  .container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 24px;
+    min-width: 300px;
+    max-width: 400px;
+  }
+
+  .canvas-wrap {
+    position: relative;
+    background: var(--bg-card);
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 0 30px var(--glow), 0 4px 24px rgba(0,0,0,0.4);
+    transition: box-shadow 0.6s ease;
+  }
+
+  canvas {
+    display: block;
+    border-radius: 8px;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+
+  .info {
+    text-align: center;
+    width: 100%;
+  }
+
+  .animal-name {
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+    text-transform: capitalize;
+  }
+
+  .state-label {
+    font-size: 0.95rem;
+    color: var(--text-dim);
+    transition: color 0.3s ease, opacity 0.3s ease;
+    min-height: 1.4em;
+  }
+
+  .state-label.active {
+    color: var(--accent);
+  }
+
+  .spinner {
+    display: inline-block;
+    margin-right: 4px;
+  }
+
+  /* Progress bar */
+  .progress-wrap {
+    width: 100%;
+    height: 4px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 2px;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .progress-wrap.visible { opacity: 1; }
+
+  .progress-bar {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+
+  /* Connection indicator */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--error);
+    transition: background 0.3s ease;
+  }
+
+  .status-dot.connected { background: var(--success); }
+
+  .tool-label {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    opacity: 0.7;
+    min-height: 1.2em;
+    transition: opacity 0.3s ease;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="canvas-wrap" id="canvasWrap">
+    <canvas id="sprite" width="256" height="256"></canvas>
+  </div>
+
+  <div class="info">
+    <div class="animal-name" id="animalName">loading...</div>
+    <div class="state-label" id="stateLabel"></div>
+    <div class="tool-label" id="toolLabel"></div>
+  </div>
+
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-bar" id="progressBar"></div>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">connecting...</span>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ── Configuration ────────────────────────────────────────────────────────
+
+  const DAEMON_PORT = 7337;
+  const WS_PORT = 7338;
+  const DAEMON_URL = `http://localhost:${DAEMON_PORT}`;
+  const WS_URL = `ws://localhost:${WS_PORT}`;
+  const PIXEL_SCALE = 16;  // 16x16 sprite at 16x = 256x256 canvas
+  const RECONNECT_DELAY = 2000;
+
+  // ── DOM refs ─────────────────────────────────────────────────────────────
+
+  const canvas = document.getElementById('sprite');
+  const ctx = canvas.getContext('2d');
+  const canvasWrap = document.getElementById('canvasWrap');
+  const animalNameEl = document.getElementById('animalName');
+  const stateLabelEl = document.getElementById('stateLabel');
+  const toolLabelEl = document.getElementById('toolLabel');
+  const progressWrap = document.getElementById('progressWrap');
+  const progressBar = document.getElementById('progressBar');
+  const statusDot = document.getElementById('statusDot');
+  const statusText = document.getElementById('statusText');
+
+  // ── State ────────────────────────────────────────────────────────────────
+
+  let sprites = null;        // all sprite data from /sprites
+  let frameSpeeds = {};      // ms per frame per state
+  let stateLabels = {};      // display labels per state
+  let currentAnimal = '';
+  let currentState = 'idle';
+  let currentLabel = '';
+  let frameIndex = 0;
+  let lastFrameTime = 0;
+  let wsConnected = false;
+  let ws = null;
+  let spinnerIndex = 0;
+  let progressValue = 0;
+
+  const SPINNERS = ['\u280B', '\u2819', '\u2839', '\u2838', '\u283C', '\u2834', '\u2826', '\u2827', '\u2807', '\u280F'];
+
+  // State-based glow colors
+  const STATE_COLORS = {
+    idle:      'rgba(233, 69, 96, 0.25)',
+    thinking:  'rgba(139, 92, 246, 0.4)',
+    coding:    'rgba(59, 130, 246, 0.4)',
+    reading:   'rgba(234, 179, 8, 0.35)',
+    searching: 'rgba(249, 115, 22, 0.4)',
+    browsing:  'rgba(6, 182, 212, 0.4)',
+    executing: 'rgba(16, 185, 129, 0.4)',
+    planning:  'rgba(139, 92, 246, 0.35)',
+    waiting:   'rgba(156, 163, 175, 0.3)',
+    success:   'rgba(74, 222, 128, 0.5)',
+    error:     'rgba(248, 113, 113, 0.5)',
+    mcp:       'rgba(168, 85, 247, 0.4)',
+    skill:     'rgba(251, 191, 36, 0.4)',
+    sleeping:  'rgba(100, 116, 139, 0.2)',
+    greeting:  'rgba(251, 191, 36, 0.45)',
+  };
+
+  // Active states that show spinner
+  const ACTIVE_STATES = new Set([
+    'thinking', 'coding', 'reading', 'searching', 'browsing',
+    'executing', 'planning', 'mcp', 'skill',
+  ]);
+
+  // ── Fetch sprite data ────────────────────────────────────────────────────
+
+  async function fetchSprites() {
+    try {
+      const res = await fetch(`${DAEMON_URL}/sprites`);
+      const data = await res.json();
+      sprites = data.sprites;
+      frameSpeeds = data.frameSpeeds || {};
+      stateLabels = data.stateLabels || {};
+    } catch (e) {
+      console.warn('Failed to fetch sprites, retrying in 3s...', e);
+      setTimeout(fetchSprites, 3000);
+    }
+  }
+
+  // ── WebSocket ────────────────────────────────────────────────────────────
+
+  function connectWS() {
+    ws = new WebSocket(WS_URL);
+
+    ws.onopen = () => {
+      wsConnected = true;
+      statusDot.classList.add('connected');
+      statusText.textContent = 'connected';
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.animal && msg.animal !== currentAnimal) {
+          currentAnimal = msg.animal;
+          animalNameEl.textContent = msg.animal;
+        }
+        if (msg.state && msg.state !== currentState) {
+          currentState = msg.state;
+          frameIndex = 0;
+          lastFrameTime = 0;
+          updateGlow();
+          updateProgress();
+        }
+        if (msg.label !== undefined) {
+          currentLabel = msg.label;
+        }
+        updateLabels();
+      } catch (e) {
+        console.warn('Bad WS message:', e);
+      }
+    };
+
+    ws.onclose = () => {
+      wsConnected = false;
+      statusDot.classList.remove('connected');
+      statusText.textContent = 'reconnecting...';
+      setTimeout(connectWS, RECONNECT_DELAY);
+    };
+
+    ws.onerror = () => {
+      ws.close();
+    };
+  }
+
+  // ── UI updates ───────────────────────────────────────────────────────────
+
+  function updateLabels() {
+    const label = stateLabels[currentState] || currentState;
+    const isActive = ACTIVE_STATES.has(currentState);
+
+    if (isActive) {
+      const spin = SPINNERS[spinnerIndex % SPINNERS.length];
+      stateLabelEl.innerHTML = `<span class="spinner">${spin}</span>${label}`;
+      stateLabelEl.classList.add('active');
+    } else {
+      stateLabelEl.textContent = label;
+      stateLabelEl.classList.remove('active');
+    }
+
+    toolLabelEl.textContent = currentLabel || '';
+  }
+
+  function updateGlow() {
+    const color = STATE_COLORS[currentState] || STATE_COLORS.idle;
+    canvasWrap.style.boxShadow = `0 0 30px ${color}, 0 4px 24px rgba(0,0,0,0.4)`;
+  }
+
+  function updateProgress() {
+    if (ACTIVE_STATES.has(currentState)) {
+      progressWrap.classList.add('visible');
+      progressValue = 0;
+    } else if (currentState === 'success') {
+      progressBar.style.width = '100%';
+      setTimeout(() => {
+        progressWrap.classList.remove('visible');
+        progressValue = 0;
+        progressBar.style.width = '0%';
+      }, 1200);
+    } else {
+      progressWrap.classList.remove('visible');
+      progressValue = 0;
+      progressBar.style.width = '0%';
+    }
+  }
+
+  // ── Rendering ────────────────────────────────────────────────────────────
+
+  function drawFrame(spriteData, palette, frame) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    for (let y = 0; y < frame.length; y++) {
+      const row = frame[y];
+      for (let x = 0; x < row.length; x++) {
+        const ch = row[x];
+        if (ch === '0') continue; // transparent
+
+        const colorIndex = parseInt(ch, 16) - 1;
+        if (colorIndex >= 0 && colorIndex < palette.length) {
+          ctx.fillStyle = palette[colorIndex];
+          ctx.fillRect(x * PIXEL_SCALE, y * PIXEL_SCALE, PIXEL_SCALE, PIXEL_SCALE);
+        }
+      }
+    }
+  }
+
+  function animate(timestamp) {
+    requestAnimationFrame(animate);
+
+    if (!sprites || !currentAnimal) return;
+
+    const spriteData = sprites[currentAnimal];
+    if (!spriteData) return;
+
+    const frames = spriteData.states[currentState] || spriteData.states.idle;
+    if (!frames || frames.length === 0) return;
+
+    const speed = frameSpeeds[currentState] || 400;
+
+    if (timestamp - lastFrameTime >= speed) {
+      lastFrameTime = timestamp;
+      frameIndex = (frameIndex + 1) % frames.length;
+      drawFrame(spriteData, spriteData.palette, frames[frameIndex]);
+
+      // Update spinner
+      spinnerIndex++;
+      updateLabels();
+
+      // Animate progress bar
+      if (ACTIVE_STATES.has(currentState)) {
+        progressValue = Math.min(progressValue + (2 + Math.random() * 3), 90);
+        progressBar.style.width = progressValue + '%';
+      }
+    }
+  }
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+
+  async function init() {
+    // Draw a loading placeholder
+    ctx.fillStyle = '#2a2a4a';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#8892a4';
+    ctx.font = '16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('loading...', canvas.width / 2, canvas.height / 2);
+
+    await fetchSprites();
+    connectWS();
+    updateGlow();
+    requestAnimationFrame(animate);
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
