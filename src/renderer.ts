@@ -1,5 +1,5 @@
 /**
- * Pixel art → ANSI terminal renderer
+ * Pixel art → ANSI terminal renderer v1.1
  *
  * Uses the Unicode UPPER HALF BLOCK (▀ U+2580) technique:
  *   Each pair of pixel rows collapses into one terminal row.

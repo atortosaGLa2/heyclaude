@@ -17,6 +17,7 @@ import { hamster }   from './hamster.js';
 import { jellyfish } from './jellyfish.js';
 import { dolphin }  from './dolphin.js';
 import { wolf }     from './wolf.js';
+import { flamingo } from './flamingo.js';
 import { fallback }  from './fallback.js';
 
 export type { Sprite };
@@ -42,6 +43,7 @@ const REGISTRY: Record<string, Sprite> = {
   jellyfish,
   dolphin,
   wolf,
+  flamingo,
 };
 
 /** All animal names that map to custom sprites */

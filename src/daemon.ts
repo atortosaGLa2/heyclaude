@@ -1,8 +1,8 @@
 /**
  * heyclaude daemon
  *
- * - HTTP server on :7337  → receives hook events from Claude Code
- * - WebSocket server on :7338 → pushes state to the render-loop process
+ * - HTTP server on :7337  → hook events API + web UI (single port)
+ * - WebSocket server on :7338 → pushes state to render-loop / web UI
  *
  * Usage: heyclaude start  (called by install script / user)
  */
