@@ -1,3 +1,4 @@
+/** Color theme for heyclaude UI chrome */
 export interface Theme {
   name: string;
   bg: string;

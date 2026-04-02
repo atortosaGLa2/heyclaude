@@ -187,9 +187,15 @@ export function renderUI(
   const elapsed   = stateStartTime ? Date.now() - stateStartTime : 0;
   const timeStr   = elapsed > 1000 ? formatElapsed(elapsed) : '';
 
-  // ANSI theme colors
+  // ANSI theme colors — border color changes per state
   const cBg      = bg(t.bg);
-  const cBorder  = fg(t.dim);
+  const borderColor = state === 'waiting' ? '#ffaa44'
+    : state === 'error' ? '#ff4444'
+    : state === 'success' ? '#22cc66'
+    : state === 'coding' ? t.accent2
+    : state === 'executing' ? '#ffaa22'
+    : t.dim;
+  const cBorder  = fg(borderColor);
   const cAccent1 = fg(t.accent1);
   const cAccent2 = fg(t.accent2);
   const cDim     = fg(t.dim);
@@ -233,12 +239,23 @@ export function renderUI(
     cBg + cBorder + ' │' + RESET + '\n';
 
   // ── State label row with spinner and elapsed time ──
-  const labelContent = `${spinner} ${label}`;
+  // Waiting state gets a blinking arrow indicator
+  const stateIcon = state === 'waiting'
+    ? (frameIndex % 2 === 0 ? '▶' : '▷')
+    : spinner;
+  const stateColor = state === 'waiting'
+    ? fg('#ffaa44')  // amber for waiting
+    : state === 'error'
+    ? fg('#ff4444')  // red for error
+    : state === 'success'
+    ? fg('#22cc66')  // green for success
+    : cAccent2;
+  const labelContent = `${stateIcon} ${label}`;
   const maxLabelW = innerW - 2 - (timeStr ? timeStr.length + 1 : 0);
   const labelTrunc = labelContent.slice(0, maxLabelW);
   const gap = innerW - 2 - labelTrunc.length - (timeStr ? timeStr.length + 1 : 0);
   const labelLine = cBg + cBorder + '│ ' + RESET +
-    cBg + cAccent2 + labelTrunc +
+    cBg + stateColor + labelTrunc +
     (timeStr ? ' '.repeat(Math.max(1, gap)) + cDim + timeStr : ' '.repeat(Math.max(0, innerW - 2 - labelTrunc.length))) +
     RESET + cBg + cBorder + ' │' + RESET + '\n';
 

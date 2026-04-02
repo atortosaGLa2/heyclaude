@@ -95,8 +95,7 @@ describe('STATE_TIMEOUTS', () => {
     expect(typeof STATE_TIMEOUTS.thinking).toBe('number');
   });
 
-  it('has a timeout for waiting', () => {
-    expect(STATE_TIMEOUTS.waiting).toBeDefined();
-    expect(typeof STATE_TIMEOUTS.waiting).toBe('number');
+  it('waiting has no timeout (stays until user acts)', () => {
+    expect(STATE_TIMEOUTS.waiting).toBeUndefined();
   });
 });

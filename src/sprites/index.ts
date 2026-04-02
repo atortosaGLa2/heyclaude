@@ -9,7 +9,15 @@ import { penguin }  from './penguin.js';
 import { dragon }   from './dragon.js';
 import { robot }    from './robot.js';
 import { panda }    from './panda.js';
-import { fallback } from './fallback.js';
+import { turtle }   from './turtle.js';
+import { hedgehog } from './hedgehog.js';
+import { koala }    from './koala.js';
+import { sloth }    from './sloth.js';
+import { hamster }   from './hamster.js';
+import { jellyfish } from './jellyfish.js';
+import { dolphin }  from './dolphin.js';
+import { wolf }     from './wolf.js';
+import { fallback }  from './fallback.js';
 
 export type { Sprite };
 
@@ -26,6 +34,14 @@ const REGISTRY: Record<string, Sprite> = {
   dragon,
   robot,
   panda,
+  turtle,
+  hedgehog,
+  koala,
+  sloth,
+  hamster,
+  jellyfish,
+  dolphin,
+  wolf,
 };
 
 /** All animal names that map to custom sprites */

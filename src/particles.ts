@@ -1,5 +1,5 @@
 /**
- * Particle effect system for heyclaude
+ * Particle effect system for heyclaude v1.0.0
  *
  * Renders text-based particle overlays on top of sprite frames.
  * Each animation state can have its own particle configuration.
@@ -130,6 +130,72 @@ const PARTICLE_CONFIGS: Partial<Record<AnimationState, ParticleConfig>> = {
     direction: 'up',
     region: { x0: 4, y0: 0, x1: 12, y1: 3 },
     color: '#ffdd44',
+  },
+  waiting: {
+    chars: ['?', '!', '·', '¿'],
+    count: 1,
+    spawnRate: 4,
+    lifetime: 18,
+    gravity: -0.08,
+    speed: 0.2,
+    direction: 'up',
+    region: { x0: 8, y0: 0, x1: 15, y1: 3 },
+    color: '#ffaa44',
+  },
+  sleeping: {
+    chars: ['Z', 'z', '·'],
+    count: 1,
+    spawnRate: 8,
+    lifetime: 20,
+    gravity: -0.06,
+    speed: 0.15,
+    direction: 'up',
+    region: { x0: 10, y0: 0, x1: 15, y1: 2 },
+    color: '#6666aa',
+  },
+  greeting: {
+    chars: ['♪', '♫', '★', '·', '!'],
+    count: 2,
+    spawnRate: 2,
+    lifetime: 10,
+    gravity: -0.1,
+    speed: 0.6,
+    direction: 'radial',
+    region: { x0: 2, y0: 1, x1: 14, y1: 5 },
+    color: '#ffcc44',
+  },
+  reading: {
+    chars: ['│', '┃', '·'],
+    count: 1,
+    spawnRate: 6,
+    lifetime: 8,
+    gravity: 0,
+    speed: 0.3,
+    direction: 'left',
+    region: { x0: 12, y0: 3, x1: 16, y1: 7 },
+    color: '#888899',
+  },
+  planning: {
+    chars: ['⚙', '⟳', '·', '○'],
+    count: 1,
+    spawnRate: 5,
+    lifetime: 12,
+    gravity: 0,
+    speed: 0.2,
+    direction: 'radial',
+    region: { x0: 10, y0: 0, x1: 15, y1: 4 },
+    color: '#9b7ae8',
+  },
+  idle: {
+    chars: ['·'],
+    count: 1,
+    spawnRate: 20,
+    lifetime: 12,
+    gravity: -0.03,
+    speed: 0.1,
+    direction: 'up',
+    region: { x0: 2, y0: 1, x1: 14, y1: 6 },
+    color: '#555577',
   },
 };
 

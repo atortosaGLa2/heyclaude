@@ -37,7 +37,7 @@ export const STATE_TIMEOUTS: Partial<Record<AnimationState, number>> = {
   success:  2000,
   error:    3000,
   thinking: 30000,
-  waiting:  60000,
+  // waiting has NO timeout — stays until user acts
   greeting: 3000,
 };
 
@@ -47,7 +47,7 @@ export const SLEEP_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 /** Frame speed (ms per frame) for each state */
 export const FRAME_SPEED: Partial<Record<AnimationState, number>> = {
   idle:      600,
-  waiting:   800,
+  waiting:   600,
   sleeping:  1000,
   success:   200,
   error:     400,
@@ -73,7 +73,7 @@ export const STATE_LABELS: Record<AnimationState, string> = {
   browsing:  'browsing web',
   executing: 'executing',
   planning:  'planning',
-  waiting:   'waiting...',
+  waiting:   'your turn!',
   success:   'done!',
   error:     'oops!',
   mcp:       'plugin call',
