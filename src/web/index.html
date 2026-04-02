@@ -46,7 +46,7 @@
     border-radius: 16px;
     padding: 16px;
     box-shadow: 0 0 30px var(--glow), 0 4px 24px rgba(0,0,0,0.4);
-    transition: box-shadow 0.6s ease;
+    /* transition is set in enhanced state transitions section */
   }
 
   canvas {
@@ -186,39 +186,14 @@
     50% { box-shadow: 0 0 25px rgba(255, 170, 68, 0.6), 0 0 50px rgba(255, 170, 68, 0.2); }
   }
 
-  /* Error state - red flash + shake */
-  .canvas-wrap.state-error {
-    animation: shake 0.5s ease-in-out;
-    box-shadow: 0 0 20px rgba(255, 68, 68, 0.5);
-  }
+  /* Error/success/sleeping states are defined in enhanced state transitions below */
   @keyframes shake {
     0%, 100% { transform: translateX(0); }
     25% { transform: translateX(-4px); }
     75% { transform: translateX(4px); }
   }
 
-  /* Success state - golden burst */
-  .canvas-wrap.state-success {
-    box-shadow: 0 0 25px rgba(255, 204, 51, 0.5), 0 0 50px rgba(255, 204, 51, 0.2);
-    transition: box-shadow 0.3s ease;
-  }
-
-  /* Sleeping state - dim overlay */
-  .canvas-wrap.state-sleeping {
-    opacity: 0.7;
-    filter: brightness(0.8);
-    transition: opacity 0.5s ease, filter 0.5s ease;
-  }
-
-  /* Coding state - purple glow */
-  .canvas-wrap.state-coding {
-    box-shadow: 0 0 15px rgba(124, 106, 247, 0.4);
-  }
-
-  /* Executing state - amber pulse */
-  .canvas-wrap.state-executing {
-    box-shadow: 0 0 15px rgba(255, 170, 34, 0.4);
-  }
+  /* Coding and executing states are defined in enhanced state transitions below */
 
   /* Notification bell for waiting */
   .notification-bell {
@@ -238,13 +213,221 @@
     60% { transform: rotate(8deg); }
     80% { transform: rotate(-8deg); }
   }
+
+  /* ── Confetti system ──────────────────────────────────────────────────── */
+  .confetti-container {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 0.3s;
+    z-index: 20;
+  }
+  .confetti-container.active { opacity: 1; }
+  .confetti {
+    position: absolute;
+    width: 6px; height: 6px;
+    border-radius: 2px;
+    top: -10px;
+  }
+  @keyframes confettiFall0 { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(320px) rotate(720deg); opacity: 0; } }
+  @keyframes confettiFall1 { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(350px) rotate(-540deg); opacity: 0; } }
+  @keyframes confettiFall2 { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(300px) rotate(480deg); opacity: 0; } }
+  @keyframes confettiFall3 { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(340px) rotate(-660deg); opacity: 0; } }
+  @keyframes confettiFall4 { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(310px) rotate(600deg); opacity: 0; } }
+
+  /* ── Background effects per state ─────────────────────────────────────── */
+  .bg-effect {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    border-radius: 16px;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    z-index: 0;
+  }
+  .bg-effect.active { opacity: 1; }
+
+  /* Coding: faint code rain */
+  .bg-coding::before, .bg-coding::after {
+    content: '0 1 0 1 1 0 1 0 0 1';
+    position: absolute;
+    font-family: monospace;
+    font-size: 10px;
+    color: #22cc66;
+    opacity: 0.05;
+    white-space: nowrap;
+    animation: codeRain 4s linear infinite;
+  }
+  .bg-coding::before { left: 15%; top: -20px; animation-delay: 0s; }
+  .bg-coding::after { left: 55%; top: -20px; animation-delay: 2s; }
+  @keyframes codeRain {
+    0% { transform: translateY(-20px); opacity: 0; }
+    10% { opacity: 0.05; }
+    90% { opacity: 0.05; }
+    100% { transform: translateY(280px); opacity: 0; }
+  }
+
+  /* Executing: pulsing concentric amber rings */
+  .bg-executing::before {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 40px; height: 40px;
+    border: 2px solid rgba(255, 170, 34, 0.15);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    animation: ringPulse 2s ease-out infinite;
+  }
+  .bg-executing::after {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 40px; height: 40px;
+    border: 2px solid rgba(255, 170, 34, 0.1);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    animation: ringPulse 2s ease-out infinite 1s;
+  }
+  @keyframes ringPulse {
+    0% { width: 40px; height: 40px; opacity: 0.3; }
+    100% { width: 260px; height: 260px; opacity: 0; }
+  }
+
+  /* Thinking: slowly rotating gradient halo */
+  .bg-thinking::before {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 240px; height: 240px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: conic-gradient(
+      from 0deg,
+      rgba(139, 92, 246, 0) 0deg,
+      rgba(139, 92, 246, 0.08) 90deg,
+      rgba(139, 92, 246, 0) 180deg,
+      rgba(139, 92, 246, 0.08) 270deg,
+      rgba(139, 92, 246, 0) 360deg
+    );
+    animation: haloRotate 6s linear infinite;
+  }
+  @keyframes haloRotate {
+    0% { transform: translate(-50%, -50%) rotate(0deg); }
+    100% { transform: translate(-50%, -50%) rotate(360deg); }
+  }
+
+  /* Searching: scanning line effect */
+  .bg-searching::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(249, 115, 22, 0.2), transparent);
+    animation: scanLine 2s ease-in-out infinite;
+  }
+  @keyframes scanLine {
+    0%, 100% { top: 10%; }
+    50% { top: 90%; }
+  }
+
+  /* ── Trail / afterimage effect ────────────────────────────────────────── */
+  .afterimage {
+    position: absolute;
+    top: 16px; left: 16px;
+    pointer-events: none;
+    opacity: 0;
+    filter: blur(3px);
+    transition: opacity 0.35s ease-out;
+    z-index: 1;
+  }
+  .afterimage.flash {
+    opacity: 0.3;
+  }
+
+  /* ── Enhanced state transitions ───────────────────────────────────────── */
+  .canvas-wrap {
+    transition: box-shadow 0.5s ease, filter 0.3s ease, transform 0.3s ease;
+  }
+  .canvas-wrap.state-coding {
+    box-shadow: 0 0 20px rgba(124, 106, 247, 0.4), 0 0 40px rgba(124, 106, 247, 0.15);
+    filter: brightness(1.02);
+  }
+  .canvas-wrap.state-executing {
+    box-shadow: 0 0 20px rgba(255, 170, 34, 0.4), 0 0 40px rgba(255, 170, 34, 0.15);
+    filter: brightness(1.03);
+  }
+  .canvas-wrap.state-thinking {
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.4), 0 0 40px rgba(139, 92, 246, 0.15);
+    filter: brightness(1.01);
+  }
+  .canvas-wrap.state-searching {
+    box-shadow: 0 0 20px rgba(249, 115, 22, 0.4), 0 0 40px rgba(249, 115, 22, 0.15);
+    filter: brightness(1.02);
+  }
+  .canvas-wrap.state-success {
+    box-shadow: 0 0 25px rgba(255, 204, 51, 0.5), 0 0 50px rgba(255, 204, 51, 0.2);
+    filter: brightness(1.08);
+    transform: scale(1.02);
+  }
+  .canvas-wrap.state-error {
+    animation: shake 0.5s ease-in-out;
+    box-shadow: 0 0 25px rgba(255, 68, 68, 0.5), 0 0 45px rgba(255, 68, 68, 0.2);
+    filter: brightness(1.05) saturate(1.2);
+  }
+  .canvas-wrap.state-sleeping {
+    opacity: 0.7;
+    filter: brightness(0.75) saturate(0.8);
+    transform: scale(0.98);
+  }
+
+  /* ── Interactive hover effects ────────────────────────────────────────── */
+  .canvas-wrap:hover {
+    transform: scale(1.05);
+    filter: brightness(1.1);
+    cursor: pointer;
+  }
+  .canvas-wrap.state-sleeping:hover {
+    opacity: 0.85;
+    transform: scale(1.02);
+  }
+  .state-tooltip {
+    position: absolute;
+    bottom: -32px;
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    background: rgba(0, 0, 0, 0.75);
+    color: #fff;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 30;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+  .canvas-wrap:hover .state-tooltip {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 </style>
 </head>
 <body>
 <div class="container">
   <div class="canvas-wrap" id="canvasWrap">
-    <canvas id="sprite" width="256" height="256"></canvas>
+    <div class="bg-effect" id="bgEffect"></div>
+    <canvas id="afterimage" class="afterimage" width="256" height="256"></canvas>
+    <canvas id="sprite" width="256" height="256" style="position:relative;z-index:2;"></canvas>
+    <div class="confetti-container" id="confettiContainer"></div>
     <div class="notification-bell" id="notificationBell">🔔</div>
+    <div class="state-tooltip" id="stateTooltip">idle</div>
   </div>
   <div class="speech-bubble" id="speechBubble">
     <span>Hey! Your turn</span>
@@ -294,6 +477,11 @@
   const statusText = document.getElementById('statusText');
   const speechBubble = document.getElementById('speechBubble');
   const bell = document.getElementById('notificationBell');
+  const confettiContainer = document.getElementById('confettiContainer');
+  const bgEffect = document.getElementById('bgEffect');
+  const afterimageCanvas = document.getElementById('afterimage');
+  const afterCtx = afterimageCanvas.getContext('2d');
+  const stateTooltip = document.getElementById('stateTooltip');
 
   // ── State ────────────────────────────────────────────────────────────────
 
@@ -456,6 +644,75 @@
       progressBar.style.width = '0%';
     }
   }
+
+  // ── Confetti system ──────────────────────────────────────────────────
+
+  const CONFETTI_COLORS = ['#ffcc33', '#ff6b8a', '#7c6af7', '#22cc66', '#44ccff'];
+  let confettiTimeout = null;
+
+  function spawnConfetti() {
+    confettiContainer.innerHTML = '';
+    const count = 25;
+    for (let i = 0; i < count; i++) {
+      const piece = document.createElement('div');
+      piece.className = 'confetti';
+      const color = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
+      const left = Math.random() * 100;
+      const animIndex = i % 5;
+      const delay = Math.random() * 0.6;
+      const duration = 1.2 + Math.random() * 0.8;
+      piece.style.cssText = `
+        background: ${color};
+        left: ${left}%;
+        width: ${4 + Math.random() * 5}px;
+        height: ${4 + Math.random() * 5}px;
+        animation: confettiFall${animIndex} ${duration}s ease-out ${delay}s forwards;
+      `;
+      confettiContainer.appendChild(piece);
+    }
+    confettiContainer.classList.add('active');
+    if (confettiTimeout) clearTimeout(confettiTimeout);
+    confettiTimeout = setTimeout(() => {
+      confettiContainer.classList.remove('active');
+      setTimeout(() => { confettiContainer.innerHTML = ''; }, 300);
+    }, 2000);
+  }
+
+  // ── Background effects ──────────────────────────────────────────────
+
+  const BG_EFFECT_STATES = new Set(['coding', 'executing', 'thinking', 'searching']);
+  let currentBgClass = '';
+
+  function updateBgEffect() {
+    if (BG_EFFECT_STATES.has(currentState)) {
+      if (currentBgClass) bgEffect.classList.remove(currentBgClass);
+      currentBgClass = 'bg-' + currentState;
+      bgEffect.classList.add(currentBgClass);
+      bgEffect.classList.add('active');
+    } else {
+      bgEffect.classList.remove('active');
+      if (currentBgClass) {
+        bgEffect.classList.remove(currentBgClass);
+        currentBgClass = '';
+      }
+    }
+  }
+
+  // ── Trail / afterimage ──────────────────────────────────────────────
+
+  function flashAfterimage() {
+    afterCtx.clearRect(0, 0, afterimageCanvas.width, afterimageCanvas.height);
+    afterCtx.drawImage(canvas, 0, 0);
+    afterimageCanvas.classList.add('flash');
+    setTimeout(() => { afterimageCanvas.classList.remove('flash'); }, 350);
+  }
+
+  // ── Hover tooltip ───────────────────────────────────────────────────
+
+  canvasWrap.addEventListener('mouseenter', () => {
+    const label = stateLabels[currentState] || currentState;
+    stateTooltip.textContent = label;
+  });
 
   // ── Rendering ────────────────────────────────────────────────────────────
 

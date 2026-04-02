@@ -4,7 +4,11 @@
  * Runs inside the tmux pane (or standalone terminal). Connects to the daemon
  * via WebSocket, receives state updates, and renders the animated mascot.
  *
- * Usage: heyclaude render  (launched into a split pane)
+ * Features:
+ * - Smooth state transitions with brief flash effect
+ * - Particle effects overlay
+ * - Auto-sleep after 5 minutes idle
+ * - Theme support via env vars
  */
 
 import { WebSocket } from 'ws';
@@ -30,10 +34,57 @@ let connected       = false;
 let stateStartTime  = Date.now();
 let lastActivityTime = Date.now();
 
-// Particle engine
+// ── Transition system ─────────────────────────────────────────────────────────
+
+interface Transition {
+  fromState: AnimationState;
+  toState: AnimationState;
+  framesRemaining: number;
+  totalFrames: number;
+}
+
+let activeTransition: Transition | null = null;
+const TRANSITION_FRAMES = 3; // Number of transition frames (fast flash)
+
+// State transition flash colors
+const TRANSITION_FLASH: Partial<Record<AnimationState, string>> = {
+  success:   '#22cc66',
+  error:     '#ff4444',
+  waiting:   '#ffaa44',
+  coding:    '#7c6af7',
+  executing: '#ffaa22',
+  greeting:  '#ffcc44',
+  sleeping:  '#6666aa',
+};
+
+function startTransition(from: AnimationState, to: AnimationState): void {
+  activeTransition = {
+    fromState: from,
+    toState: to,
+    framesRemaining: TRANSITION_FRAMES,
+    totalFrames: TRANSITION_FRAMES,
+  };
+}
+
+function isTransitioning(): boolean {
+  return activeTransition !== null && activeTransition.framesRemaining > 0;
+}
+
+function tickTransition(): void {
+  if (activeTransition) {
+    activeTransition.framesRemaining--;
+    if (activeTransition.framesRemaining <= 0) {
+      activeTransition = null;
+    }
+  }
+}
+
+// ── Particle engine ───────────────────────────────────────────────────────────
+
 const particles = new ParticleEngine();
 
-// Theme (can be overridden via env or daemon message)
+// ── Theme ─────────────────────────────────────────────────────────────────────
+
 let theme: RenderTheme | undefined;
 if (process.env.HEYCLAUDE_THEME_BG) {
   theme = {
@@ -61,19 +112,40 @@ function renderTick() {
   particles.setState(effectiveState);
   particles.tick();
 
+  // During transition, apply a brief theme override for the flash effect
+  let renderTheme = theme;
+  if (isTransitioning() && activeTransition) {
+    const flashColor = TRANSITION_FLASH[activeTransition.toState];
+    if (flashColor) {
+      const progress = activeTransition.framesRemaining / activeTransition.totalFrames;
+      // Flash: border brightens then returns to normal
+      if (progress > 0.5) {
+        renderTheme = {
+          ...(theme ?? {
+            bg: '#1a1a2e', border: '#2a2a4e', accent1: '#da7756',
+            accent2: '#7c6af7', dim: '#646682', text: '#e0e0e0',
+          }),
+          dim: flashColor, // Flash the border color
+        };
+      }
+    }
+    tickTransition();
+  }
+
   const output = renderUI(
     sprite,
     effectiveState,
     frameIndex,
     current.label || undefined,
-    theme,
+    renderTheme,
     particles,
     stateStartTime,
   );
   process.stdout.write(output);
   frameIndex++;
 
-  const speed = getFrameSpeed(effectiveState);
+  // Speed: transitions render faster for snappy feel
+  const speed = isTransitioning() ? 100 : getFrameSpeed(effectiveState);
   frameTimer = setTimeout(renderTick, speed);
 }
 
@@ -100,7 +172,8 @@ function connect() {
       current = data;
 
       if (data.state !== prevState) {
-        // State changed — restart frame sequence
+        // State changed — trigger transition effect
+        startTransition(prevState as AnimationState, data.state as AnimationState);
         frameIndex = 0;
         stateStartTime = Date.now();
         lastActivityTime = Date.now();
