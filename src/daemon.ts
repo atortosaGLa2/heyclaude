@@ -116,6 +116,18 @@ app.get('/sprites', (_req, res) => {
   });
 });
 
+/** POST /animal — switch the displayed animal (for testing) */
+app.post('/animal', (req, res) => {
+  const { animal: newAnimal } = req.body ?? {};
+  if (newAnimal && typeof newAnimal === 'string') {
+    daemonState.animal = newAnimal;
+    broadcast();
+    res.json({ ok: true, animal: newAnimal });
+  } else {
+    res.status(400).json({ error: 'provide { "animal": "name" }' });
+  }
+});
+
 app.post('/stop', (_req, res) => {
   res.json({ ok: true });
   setTimeout(() => process.exit(0), 100);
