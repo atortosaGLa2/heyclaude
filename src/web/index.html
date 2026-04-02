@@ -273,10 +273,10 @@
 
   // ── Configuration ────────────────────────────────────────────────────────
 
-  const DAEMON_PORT = 7337;
-  const WS_PORT = 7338;
-  const DAEMON_URL = `http://localhost:${DAEMON_PORT}`;
-  const WS_URL = `ws://localhost:${WS_PORT}`;
+  // Web UI is served by the daemon — use relative URLs
+  const DAEMON_URL = window.location.origin;
+  const WS_PORT = parseInt(new URLSearchParams(window.location.search).get('ws') || '7338');
+  const WS_URL = `ws://${window.location.hostname}:${WS_PORT}`;
   const PIXEL_SCALE = 16;  // 16x16 sprite at 16x = 256x256 canvas
   const RECONNECT_DELAY = 2000;
 

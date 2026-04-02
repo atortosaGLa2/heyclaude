@@ -9,26 +9,34 @@
 
 import express from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import { detectAnimal } from './session.js';
 import { hookEventToState, STATE_TIMEOUTS, FRAME_SPEED, STATE_LABELS } from './states.js';
 import { getAllSprites } from './sprites/index.js';
 import type { DaemonState, AnimationState } from './types.js';
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
 const HTTP_PORT = parseInt(process.env.HEYCLAUDE_DAEMON_PORT ?? '7337', 10);
 const WS_PORT   = parseInt(process.env.HEYCLAUDE_WS_PORT ?? '7338', 10);
-const WEB_PORT  = parseInt(process.env.HEYCLAUDE_WEB_PORT ?? '7339', 10);
 
 export { HTTP_PORT, WS_PORT };
 
 const app = express();
 app.use(express.json());
 
-// CORS: allow the web UI to call the daemon API
+// CORS
 app.use((_req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', 'Content-Type');
   next();
 });
+
+// Serve web UI from the daemon itself (no separate server needed)
+// Try dist/web first (production), then src/web (development)
+app.use(express.static(join(__dirname, 'web')));
+app.use(express.static(join(__dirname, '..', 'src', 'web')));
 
 const wss = new WebSocketServer({ port: WS_PORT });
 const clients = new Set<WebSocket>();
@@ -117,16 +125,7 @@ app.post('/stop', (_req, res) => {
 
 app.listen(HTTP_PORT, () => {
   process.stderr.write(
-    `[heyclaude] daemon running · animal=${animal} · http=:${HTTP_PORT} · ws=:${WS_PORT}\n`
+    `[heyclaude] daemon running · animal=${animal} · http=:${HTTP_PORT} · ws=:${WS_PORT}\n` +
+    `[heyclaude] web UI at http://localhost:${HTTP_PORT}\n`
   );
 });
-
-// ── Web UI (optional, started via HEYCLAUDE_WEB=1 env) ───────────────────────
-
-if (process.env.HEYCLAUDE_WEB === '1') {
-  import('./web/server.js')
-    .then(({ startWebServer }) => startWebServer(WEB_PORT))
-    .catch(() => {
-      process.stderr.write('[heyclaude] web UI module not available\n');
-    });
-}

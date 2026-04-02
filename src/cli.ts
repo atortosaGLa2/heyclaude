@@ -118,7 +118,8 @@ Options for 'start':
   --theme <name>       Theme name (claude, ocean, forest, neon, mono)
   --animal <name>      Override animal (e.g. cat, owl, dragon)
   --position <pos>     Pane position (left, right)
-  --web                Start web UI instead of terminal pane
+
+  Web UI is always available at http://localhost:7337 when daemon is running.
 
 Global options:
   --help, -h           Show this help
@@ -181,39 +182,7 @@ async function cmdStart() {
   const { loadConfig } = await import('./config.js');
   const config = loadConfig(cliOverrides);
 
-  // Web mode: start web server instead of terminal pane
-  if (flags['web']) {
-    const { startWebServer } = await import('./web/server.js');
-
-    // Spawn daemon detached
-    const daemonScript = scriptPath('daemon');
-    const runner = nodeRunner(daemonScript);
-    const daemon = spawn(runner.cmd, runner.args, {
-      detached: true,
-      stdio: 'ignore',
-      env: {
-        ...process.env,
-        HEYCLAUDE_DAEMON_PORT: String(config.daemonPort),
-        HEYCLAUDE_WS_PORT: String(config.wsPort),
-      },
-    });
-    daemon.unref();
-
-    if (daemon.pid) {
-      writePid(daemon.pid);
-      console.log(`[heyclaude] daemon started (pid=${daemon.pid})`);
-    }
-
-    await sleep(500);
-    startWebServer(config.webPort);
-    return;
-  }
-
-  // Terminal mode
-  const { selectAdapter } = await import('./adapters/index.js');
-  const adapter = selectAdapter();
-
-  // Spawn daemon detached
+  // Spawn daemon detached (serves API + web UI on same port)
   const daemonScript = scriptPath('daemon');
   const runner = nodeRunner(daemonScript);
   const daemon = spawn(runner.cmd, runner.args, {
@@ -235,20 +204,22 @@ async function cmdStart() {
   // Wait briefly for daemon to boot
   await sleep(500);
 
+  // Try to open terminal pane (tmux or standalone)
+  const { selectAdapter } = await import('./adapters/index.js');
+  const adapter = selectAdapter();
   const renderScript = scriptPath('render-loop');
   const r = nodeRunner(renderScript);
   const renderCmd = `${r.cmd} "${r.args[0]}"`;
   const ok = adapter.open(renderCmd);
   if (ok) {
     console.log(`[heyclaude] mascot pane opened via ${adapter.name}`);
-  } else {
-    console.log(`[heyclaude] could not open pane via ${adapter.name} -- run \`heyclaude render\` manually in a side terminal`);
   }
 
   // Detect + print animal
   const { detectAnimal } = await import('./session.js');
   const { animal } = detectAnimal();
   console.log(`[heyclaude] your mascot: ${animal}`);
+  console.log(`[heyclaude] web UI: http://localhost:${config.daemonPort}`);
 }
 
 async function cmdStop() {
