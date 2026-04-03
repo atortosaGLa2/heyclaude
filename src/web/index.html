@@ -609,7 +609,7 @@
     canvasWrap.className = 'canvas-wrap state-' + currentState;
 
     // For states without dedicated CSS classes, apply inline glow
-    const statesWithCSSClass = new Set(['waiting', 'error', 'success', 'sleeping', 'coding', 'executing']);
+    const statesWithCSSClass = new Set(['waiting', 'error', 'success', 'sleeping', 'coding', 'executing', 'thinking', 'searching']);
     if (!statesWithCSSClass.has(currentState)) {
       const color = STATE_COLORS[currentState] || STATE_COLORS.idle;
       canvasWrap.style.boxShadow = `0 0 30px ${color}, 0 4px 24px rgba(0,0,0,0.4)`;
@@ -625,6 +625,14 @@
       speechBubble.classList.remove('visible');
       if (bell) bell.classList.remove('visible');
     }
+
+    // Confetti burst on success
+    if (currentState === 'success') {
+      spawnConfetti();
+    }
+
+    // Toggle background effects
+    updateBgEffect();
   }
 
   function updateProgress() {
@@ -750,6 +758,12 @@
     if (timestamp - lastFrameTime >= speed) {
       lastFrameTime = timestamp;
       frameIndex = (frameIndex + 1) % frames.length;
+
+      // Flash afterimage before drawing new frame
+      if (ACTIVE_STATES.has(currentState)) {
+        flashAfterimage();
+      }
+
       drawFrame(spriteData, spriteData.palette, frames[frameIndex]);
 
       // Update spinner
