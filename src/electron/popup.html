@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>heyclaude popup</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    background: transparent;
+    overflow: hidden;
+    width: 120px;
+    height: 120px;
+    -webkit-app-region: drag;
+    user-select: none;
+  }
+
+  .popup {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  canvas {
+    display: block;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    transition: filter 0.5s ease;
+  }
+
+  /* Speech bubble */
+  .speech-bubble {
+    position: absolute;
+    top: 5px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #ffaa44;
+    color: #1a1a2e;
+    padding: 4px 10px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .speech-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 6px solid #ffaa44;
+  }
+  .speech-bubble.visible { opacity: 1; }
+
+  /* State label at bottom */
+  .state-label {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 10px;
+    color: rgba(255,255,255,0.7);
+    background: rgba(0,0,0,0.5);
+    padding: 2px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .state-label.visible { opacity: 1; }
+
+  /* Bounce on state change */
+  @keyframes bounce {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+  }
+  .bouncing { animation: bounce 0.3s ease; }
+
+  /* Sleeping pulse */
+  @keyframes sleepPulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 0.8; }
+  }
+  .sleeping { animation: sleepPulse 3s ease-in-out infinite; }
+
+  /* Error shake */
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-3px); }
+    75% { transform: translateX(3px); }
+  }
+  .shaking { animation: shake 0.4s ease-in-out; }
+</style>
+</head>
+<body>
+<div class="popup" id="popup">
+  <canvas id="sprite" width="96" height="96"></canvas>
+  <div class="speech-bubble" id="speechBubble">Hey! Your turn</div>
+  <div class="state-label" id="stateLabel"></div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  const params = new URLSearchParams(window.location.search);
+  const DAEMON_PORT = params.get('daemonPort') || '7337';
+  const WS_PORT = params.get('wsPort') || '7338';
+  const WS_URL = `ws://localhost:${WS_PORT}`;
+  const DAEMON_URL = `http://localhost:${DAEMON_PORT}`;
+  const PIXEL_SCALE = 6; // 16x16 sprite at 6x = 96x96 (fits in 120px window)
+
+  const canvas = document.getElementById('sprite');
+  const ctx = canvas.getContext('2d');
+  const popup = document.getElementById('popup');
+  const speechBubble = document.getElementById('speechBubble');
+  const stateLabel = document.getElementById('stateLabel');
+
+  let sprites = null;
+  let frameSpeeds = {};
+  let stateLabels = {};
+  let currentAnimal = '';
+  let currentState = 'idle';
+  let frameIndex = 0;
+  let lastFrameTime = 0;
+
+  // Make window interactive on hover (for dragging and right-click)
+  document.addEventListener('mouseenter', () => {
+    if (window.electronAPI) return;
+    // Electron handles this via setIgnoreMouseEvents with forward
+  });
+
+  const GLOW_COLORS = {
+    idle:      'rgba(233, 69, 96, 0.2)',
+    thinking:  'rgba(139, 92, 246, 0.4)',
+    coding:    'rgba(59, 130, 246, 0.4)',
+    reading:   'rgba(234, 179, 8, 0.3)',
+    searching: 'rgba(249, 115, 22, 0.4)',
+    browsing:  'rgba(6, 182, 212, 0.4)',
+    executing: 'rgba(16, 185, 129, 0.4)',
+    planning:  'rgba(139, 92, 246, 0.3)',
+    waiting:   'rgba(255, 170, 68, 0.5)',
+    success:   'rgba(74, 222, 128, 0.5)',
+    error:     'rgba(248, 113, 113, 0.5)',
+    mcp:       'rgba(168, 85, 247, 0.4)',
+    skill:     'rgba(251, 191, 36, 0.4)',
+    sleeping:  'rgba(100, 116, 139, 0.15)',
+    greeting:  'rgba(251, 191, 36, 0.4)',
+  };
+
+  const ACTIVE_STATES = new Set([
+    'thinking', 'coding', 'reading', 'searching', 'browsing',
+    'executing', 'planning', 'mcp', 'skill',
+  ]);
+
+  // Fetch sprites
+  async function fetchSprites() {
+    try {
+      const res = await fetch(`${DAEMON_URL}/sprites`);
+      const data = await res.json();
+      sprites = data.sprites;
+      frameSpeeds = data.frameSpeeds || {};
+      stateLabels = data.stateLabels || {};
+    } catch (e) {
+      setTimeout(fetchSprites, 3000);
+    }
+  }
+
+  // WebSocket
+  function connectWS() {
+    const ws = new WebSocket(WS_URL);
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.animal) currentAnimal = msg.animal;
+        if (msg.state && msg.state !== currentState) {
+          const prevState = currentState;
+          currentState = msg.state;
+          frameIndex = 0;
+          lastFrameTime = 0;
+          onStateChange(prevState, currentState);
+        }
+      } catch (e) {}
+    };
+
+    ws.onclose = () => setTimeout(connectWS, 2000);
+    ws.onerror = () => ws.close();
+  }
+
+  function onStateChange(prev, next) {
+    // Subtle drop-shadow on canvas per state
+    const color = GLOW_COLORS[next] || GLOW_COLORS.idle;
+    canvas.style.filter = `drop-shadow(0 0 8px ${color})`;
+
+    // Bounce effect
+    popup.classList.remove('bouncing', 'shaking', 'sleeping');
+    void popup.offsetWidth; // force reflow
+
+    if (next === 'error') {
+      popup.classList.add('shaking');
+    } else if (next === 'sleeping') {
+      popup.classList.add('sleeping');
+    } else {
+      popup.classList.add('bouncing');
+    }
+
+    // Speech bubble for waiting
+    if (next === 'waiting') {
+      speechBubble.classList.add('visible');
+    } else {
+      speechBubble.classList.remove('visible');
+    }
+
+    // State label — show briefly on change
+    const label = stateLabels[next] || next;
+    stateLabel.textContent = label;
+    stateLabel.classList.add('visible');
+    setTimeout(() => stateLabel.classList.remove('visible'), 2000);
+  }
+
+  // Rendering
+  function drawFrame(spriteData, palette, frame) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    for (let y = 0; y < frame.length; y++) {
+      const row = frame[y];
+      for (let x = 0; x < row.length; x++) {
+        const ch = row[x];
+        if (ch === '0') continue;
+
+        const colorIndex = parseInt(ch, 16) - 1;
+        if (colorIndex >= 0 && colorIndex < palette.length) {
+          ctx.fillStyle = palette[colorIndex];
+          ctx.fillRect(x * PIXEL_SCALE, y * PIXEL_SCALE, PIXEL_SCALE, PIXEL_SCALE);
+        }
+      }
+    }
+  }
+
+  function animate(timestamp) {
+    requestAnimationFrame(animate);
+
+    if (!sprites || !currentAnimal) return;
+
+    const spriteData = sprites[currentAnimal] || sprites['claude'] || Object.values(sprites)[0];
+    if (!spriteData) return;
+
+    const frames = spriteData.states[currentState] || spriteData.states.idle;
+    if (!frames || frames.length === 0) return;
+
+    const speed = frameSpeeds[currentState] || 400;
+
+    if (timestamp - lastFrameTime >= speed) {
+      lastFrameTime = timestamp;
+      frameIndex = (frameIndex + 1) % frames.length;
+      drawFrame(spriteData, spriteData.palette, frames[frameIndex]);
+    }
+  }
+
+  // Init
+  async function init() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    await fetchSprites();
+    connectWS();
+    canvas.style.filter = `drop-shadow(0 0 8px ${GLOW_COLORS.idle})`;
+    requestAnimationFrame(animate);
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

@@ -103,6 +103,9 @@ Usage:
 
 Commands:
   start                Start daemon + open mascot pane
+  popup                Launch popup mascot (starts daemon if needed)
+  popup list           List all available mascots
+  popup stop           Close the popup
   stop                 Kill daemon + close mascot pane
   render               Run the render loop (used internally by pane)
   status               Show daemon state
@@ -117,7 +120,11 @@ Commands:
 Options for 'start':
   --theme <name>       Theme name (claude, ocean, forest, neon, mono)
   --animal <name>      Override animal (e.g. cat, owl, dragon)
+  --mode <mode>        Display mode: terminal (default), popup (Electron), web (browser)
   --position <pos>     Pane position (left, right)
+
+Options for 'popup':
+  --animal <name>      Choose mascot (e.g. cat, owl, dragon, fox, flamingo)
 
   Web UI is always available at http://localhost:7337 when daemon is running.
 
@@ -204,15 +211,25 @@ async function cmdStart() {
   // Wait briefly for daemon to boot
   await sleep(500);
 
-  // Try to open terminal pane (tmux or standalone)
-  const { selectAdapter } = await import('./adapters/index.js');
-  const adapter = selectAdapter();
-  const renderScript = scriptPath('render-loop');
-  const r = nodeRunner(renderScript);
-  const renderCmd = `${r.cmd} "${r.args[0]}"`;
-  const ok = adapter.open(renderCmd);
-  if (ok) {
-    console.log(`[heyclaude] mascot pane opened via ${adapter.name}`);
+  // Select display mode
+  const mode = (typeof flags['mode'] === 'string' ? flags['mode'] : 'terminal') as 'terminal' | 'popup' | 'web';
+
+  if (mode === 'web') {
+    // Web-only mode: just open the browser
+    const open = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
+    spawn(open, [`http://localhost:${config.daemonPort}`], { detached: true, stdio: 'ignore' }).unref();
+    console.log(`[heyclaude] opened web UI in browser`);
+  } else {
+    // Terminal or popup mode
+    const { selectAdapter } = await import('./adapters/index.js');
+    const adapter = selectAdapter(mode);
+    const renderScript = scriptPath('render-loop');
+    const r = nodeRunner(renderScript);
+    const renderCmd = `${r.cmd} "${r.args[0]}"`;
+    const ok = adapter.open(renderCmd);
+    if (ok) {
+      console.log(`[heyclaude] mascot opened via ${adapter.name}`);
+    }
   }
 
   // Detect + print animal
@@ -361,10 +378,101 @@ async function cmdConfigReset() {
   console.log('[heyclaude] config reset to defaults');
 }
 
+// ── popup shortcut ───────────────────────────────────────────────────────────
+
+async function cmdPopup() {
+  const sub = subCmd ?? 'start';
+
+  if (sub === 'list' || sub === 'animals') {
+    const { SUPPORTED_ANIMALS, getSprite } = await import('./sprites/index.js');
+    const seen = new Set<string>();
+    const animals: { emoji: string; name: string }[] = [];
+    for (const name of SUPPORTED_ANIMALS) {
+      const sprite = getSprite(name);
+      if (seen.has(sprite.name)) continue;
+      seen.add(sprite.name);
+      animals.push({ emoji: sprite.emoji, name: sprite.name });
+    }
+    console.log(`\n  Available mascots (${animals.length}):\n`);
+    // Print in columns
+    const cols = 4;
+    for (let i = 0; i < animals.length; i += cols) {
+      const row = animals.slice(i, i + cols)
+        .map(a => `  ${a.emoji}  ${a.name.padEnd(12)}`)
+        .join('');
+      console.log(row);
+    }
+    console.log(`\n  Use: heyclaude popup --animal <name>\n`);
+    return;
+  }
+
+  if (sub === 'stop' || sub === 'kill') {
+    // Kill any running Electron popup
+    try {
+      const { execSync } = await import('child_process');
+      execSync('pkill -f "Electron.*main.cjs"', { stdio: 'ignore' });
+      console.log('[heyclaude] popup closed');
+    } catch {
+      console.log('[heyclaude] no popup running');
+    }
+    return;
+  }
+
+  // Start: ensure daemon is running, then launch popup
+  if (!(await isRunning())) {
+    // Start daemon first
+    const { loadConfig } = await import('./config.js');
+    const config = loadConfig();
+    const daemonScript = scriptPath('daemon');
+    const runner = nodeRunner(daemonScript);
+    const daemon = spawn(runner.cmd, runner.args, {
+      detached: true,
+      stdio: 'ignore',
+      env: {
+        ...process.env,
+        HEYCLAUDE_DAEMON_PORT: String(config.daemonPort),
+        HEYCLAUDE_WS_PORT: String(config.wsPort),
+      },
+    });
+    daemon.unref();
+    if (daemon.pid) {
+      writePid(daemon.pid);
+      console.log(`[heyclaude] daemon started (pid=${daemon.pid})`);
+    }
+    await sleep(500);
+  }
+
+  // Switch animal if --animal flag provided
+  if (typeof flags['animal'] === 'string') {
+    const { loadConfig } = await import('./config.js');
+    const config = loadConfig();
+    try {
+      await fetch(`http://localhost:${config.daemonPort}/animal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ animal: flags['animal'] }),
+        signal: AbortSignal.timeout(1000),
+      });
+    } catch { /* daemon might not be ready yet */ }
+  }
+
+  // Launch Electron popup
+  const { selectAdapter } = await import('./adapters/index.js');
+  const adapter = selectAdapter('popup');
+  const ok = adapter.open('');
+  if (ok) {
+    const animal = typeof flags['animal'] === 'string' ? flags['animal'] : (await import('./session.js')).detectAnimal().animal;
+    console.log(`[heyclaude] popup launched — ${animal}`);
+  } else {
+    console.error('[heyclaude] failed to launch popup. Is electron installed?');
+  }
+}
+
 // ── dispatch ──────────────────────────────────────────────────────────────────
 
 switch (cmd) {
   case 'start':   await cmdStart();                       break;
+  case 'popup':   await cmdPopup();                       break;
   case 'stop':    await cmdStop();                        break;
   case 'render':  await cmdRender();                      break;
   case 'status':  await cmdStatus();                      break;

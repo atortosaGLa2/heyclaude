@@ -4,9 +4,10 @@
   "description": "Animated pixel-art mascot for Claude Code — reacts to your coding in real time",
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp src/electron/popup.html src/electron/main.cjs dist/electron/ && cp src/web/index.html dist/web/index.html 2>/dev/null || true",
     "dev:daemon": "tsx src/daemon.ts",
     "dev:render": "tsx src/render-loop.ts",
+    "dev:popup": "electron src/electron/main.cjs",
     "start": "node dist/cli.js",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -15,6 +16,7 @@
     "heyclaude": "./bin/heyclaude.js"
   },
   "dependencies": {
+    "electron": "^41.1.1",
     "express": "^4.18.2",
     "ws": "^8.16.0"
   },
