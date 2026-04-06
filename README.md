@@ -187,14 +187,24 @@ The `waiting` state shows a **"Your turn!"** speech bubble above the mascot.
 
 ## Sprite Gallery
 
-heyclaude ships with 10+ hand-crafted pixel-art sprites. Your session is assigned a unique animal based on a hash of your Claude Code session ID.
+heyclaude ships with **83 hand-crafted pixel-art sprites**. Your session is assigned a unique animal based on a hash of your Claude Code session ID.
 
-| Animal    | Animal    | Animal    | Animal    |
-|-----------|-----------|-----------|-----------|
-| crab      | fox       | bunny     | dragon    |
-| octopus   | penguin   | cat       | robot     |
-| owl       | panda     | bear      | elephant  |
-| ...       |           |           |           |
+| | | | | | |
+|---|---|---|---|---|---|
+| abel 🧔 | alpaca 🦙 | axolotl 🦎 | badger 🦡 | bear 🐻 | beaver 🦫 |
+| bee 🐝 | bird 🐦 | bumblebee 🐝 | bunny 🐰 | cat 🐱 | chipmunk 🐿️ |
+| crab 🦀 | crane 🦩 | deer 🦌 | dolphin 🐬 | dove 🕊️ | dragon 🐉 |
+| dragonfly 🪰 | duckling 🐥 | eagle 🦅 | elephant 🐘 | falcon 🦅 | finch 🐦 |
+| flamingo 🦩 | fox 🦊 | frog 🐸 | giraffe 🦒 | goose 🪿 | hamster 🐹 |
+| hare 🐇 | hedgehog 🦔 | hippo 🦛 | hummingbird 🐦 | jellyfish 🪼 | koala 🐨 |
+| ladybug 🐞 | lark 🐦 | lemur 🐒 | llama 🦙 | lobster 🦞 | lynx 🐱 |
+| manatee 🦭 | meerkat 🦡 | moth 🦋 | narwhal 🐳 | newt 🦎 | octopus 🐙 |
+| otter 🦦 | owl 🦉 | panda 🐼 | parrot 🦜 | peacock 🦚 | pelican 🐦 |
+| penguin 🐧 | phoenix 🔥 | piglet 🐷 | platypus 🦆 | pony 🐴 | porcupine 🦔 |
+| puffin 🐧 | puppy 🐶 | raccoon 🦝 | raven 🐦‍⬛ | robin 🪶 | robot 🤖 |
+| salamander 🦎 | seahorse 🐎 | sloth 🦥 | snail 🐌 | sparrow 🐦 | squirrel 🐿️ |
+| swan 🦢 | toucan 🦜 | turtle 🐢 | unicorn 🦄 | viper 🐍 | walrus 🦭 |
+| weasel 🦦 | wolf 🐺 | wolverine 🐾 | wren 🐦 | | |
 
 A generic **Claude mascot** is used as the fallback for unrecognized session animals.
 
