@@ -212,7 +212,7 @@ async function cmdStart() {
   await sleep(500);
 
   // Select display mode
-  const mode = (typeof flags['mode'] === 'string' ? flags['mode'] : 'terminal') as 'terminal' | 'popup' | 'web';
+  const mode = (typeof flags['mode'] === 'string' ? flags['mode'] : 'auto') as 'auto' | 'terminal' | 'popup' | 'web';
 
   if (mode === 'web') {
     // Web-only mode: just open the browser
@@ -220,13 +220,17 @@ async function cmdStart() {
     spawn(open, [`http://localhost:${config.daemonPort}`], { detached: true, stdio: 'ignore' }).unref();
     console.log(`[heyclaude] opened web UI in browser`);
   } else {
-    // Terminal or popup mode
     const { selectAdapter } = await import('./adapters/index.js');
-    const adapter = selectAdapter(mode);
-    const renderScript = scriptPath('render-loop');
-    const r = nodeRunner(renderScript);
-    const renderCmd = `${r.cmd} "${r.args[0]}"`;
-    const ok = adapter.open(renderCmd);
+    const adapter = selectAdapter(mode === 'auto' ? undefined : mode);
+
+    // StandaloneAdapter in WSL opens the browser — pass the web URL instead of a render command
+    const isWSL = process.platform === 'linux' &&
+      (() => { try { return readFileSync('/proc/version', 'utf8').toLowerCase().includes('microsoft'); } catch { return false; } })();
+    const openArg = (adapter.name === 'standalone' && isWSL)
+      ? `http://localhost:${config.daemonPort}`
+      : (() => { const r = nodeRunner(scriptPath('render-loop')); return `${r.cmd} "${r.args[0]}"`; })();
+
+    const ok = adapter.open(openArg);
     if (ok) {
       console.log(`[heyclaude] mascot opened via ${adapter.name}`);
     }

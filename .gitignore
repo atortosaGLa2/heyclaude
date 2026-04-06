@@ -2,3 +2,5 @@ node_modules/
 dist/
 *.tsbuildinfo
 .heyclaude.pid
+.claude/settings.json
+.claude/settings.local.json

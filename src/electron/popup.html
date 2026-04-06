@@ -2,286 +2,207 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>heyclaude popup</title>
+<title>heyclaude</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-
   html, body {
-    background: transparent;
+    width: 100vw; height: 100vh;
     overflow: hidden;
-    width: 120px;
-    height: 120px;
+    background: #0a0a14;
+    display: flex; justify-content: center; align-items: center;
+    user-select: none; cursor: grab;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  }
+  .card {
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    gap: 6px; padding: 12px 10px 8px;
+    background: rgba(18,18,30,0.97);
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.8);
     -webkit-app-region: drag;
-    user-select: none;
-  }
-
-  .popup {
+    width: 90vw; max-width: 220px;
     position: relative;
-    width: 120px;
-    height: 120px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
   }
-
   canvas {
     display: block;
-    image-rendering: pixelated;
-    image-rendering: crisp-edges;
-    transition: filter 0.5s ease;
+    image-rendering: pixelated; image-rendering: crisp-edges;
+    width: 96px; height: 96px;
+    transition: filter 0.4s ease;
   }
-
-  /* Speech bubble */
+  .animal-name { font-size: 10px; color: rgba(255,255,255,0.7); letter-spacing: 1px; text-transform: uppercase; }
+  .state-label { font-size: 9px; color: rgba(255,255,255,0.35); min-height: 12px; }
   .speech-bubble {
-    position: absolute;
-    top: 5px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #ffaa44;
-    color: #1a1a2e;
-    padding: 4px 10px;
-    border-radius: 10px;
-    font-size: 11px;
-    font-weight: 700;
-    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-    white-space: nowrap;
-    opacity: 0;
-    transition: opacity 0.4s ease;
-    pointer-events: none;
-    z-index: 10;
+    position: absolute; top: -34px; left: 50%; transform: translateX(-50%);
+    background: #ffaa44; color: #1a1a2e;
+    padding: 5px 12px; border-radius: 10px; font-size: 11px; font-weight: 700;
+    white-space: nowrap; opacity: 0; transition: opacity 0.4s ease; pointer-events: none;
   }
   .speech-bubble::after {
-    content: '';
-    position: absolute;
-    bottom: -6px;
-    left: 50%;
-    transform: translateX(-50%);
-    border-left: 6px solid transparent;
-    border-right: 6px solid transparent;
-    border-top: 6px solid #ffaa44;
+    content: ''; position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%);
+    border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 5px solid #ffaa44;
   }
   .speech-bubble.visible { opacity: 1; }
-
-  /* State label at bottom */
-  .state-label {
-    position: absolute;
-    bottom: 8px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 10px;
-    color: rgba(255,255,255,0.7);
-    background: rgba(0,0,0,0.5);
-    padding: 2px 8px;
-    border-radius: 6px;
-    white-space: nowrap;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    pointer-events: none;
-    z-index: 10;
-  }
-  .state-label.visible { opacity: 1; }
-
-  /* Bounce on state change */
-  @keyframes bounce {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.08); }
-  }
-  .bouncing { animation: bounce 0.3s ease; }
-
-  /* Sleeping pulse */
-  @keyframes sleepPulse {
-    0%, 100% { opacity: 0.5; }
-    50% { opacity: 0.8; }
-  }
-  .sleeping { animation: sleepPulse 3s ease-in-out infinite; }
-
-  /* Error shake */
-  @keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-3px); }
-    75% { transform: translateX(3px); }
-  }
-  .shaking { animation: shake 0.4s ease-in-out; }
+  @keyframes bounce { 0%,100%{transform:scale(1)} 50%{transform:scale(1.07)} }
+  @keyframes shake  { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
+  @keyframes pulse  { 0%,100%{opacity:0.5} 50%{opacity:1} }
+  .bounce { animation: bounce 0.35s ease; }
+  .shake  { animation: shake 0.4s ease-in-out; }
+  .pulse  { animation: pulse 3s ease-in-out infinite; }
 </style>
 </head>
 <body>
-<div class="popup" id="popup">
-  <canvas id="sprite" width="96" height="96"></canvas>
-  <div class="speech-bubble" id="speechBubble">Hey! Your turn</div>
-  <div class="state-label" id="stateLabel"></div>
+<div class="card" id="card">
+  <div class="speech-bubble" id="bubble">Your turn!</div>
+  <canvas id="canvas" width="16" height="16"></canvas>
+  <div class="animal-name" id="animalName">heyclaude</div>
+  <div class="state-label" id="stateLabel">connecting...</div>
 </div>
-
 <script>
-(function() {
-  'use strict';
+var canvas = document.getElementById('canvas');
+var ctx = canvas.getContext('2d');
+var card = document.getElementById('card');
+var animalName = document.getElementById('animalName');
+var stateLabel = document.getElementById('stateLabel');
+var bubble = document.getElementById('bubble');
 
-  const params = new URLSearchParams(window.location.search);
-  const DAEMON_PORT = params.get('daemonPort') || '7337';
-  const WS_PORT = params.get('wsPort') || '7338';
-  const WS_URL = `ws://localhost:${WS_PORT}`;
-  const DAEMON_URL = `http://localhost:${DAEMON_PORT}`;
-  const PIXEL_SCALE = 6; // 16x16 sprite at 6x = 96x96 (fits in 120px window)
+var params = new URLSearchParams(window.location.search);
+var HTTP_PORT = params.get('daemonPort') || '7337';
+var WS_PORT = params.get('wsPort') || '7338';
+var BASE = 'http://localhost:' + HTTP_PORT;
 
-  const canvas = document.getElementById('sprite');
-  const ctx = canvas.getContext('2d');
-  const popup = document.getElementById('popup');
-  const speechBubble = document.getElementById('speechBubble');
-  const stateLabel = document.getElementById('stateLabel');
+var sprites = null;
+var animal = '';
+var state = 'idle';
+var frameIdx = 0;
+var lastTime = 0;
 
-  let sprites = null;
-  let frameSpeeds = {};
-  let stateLabels = {};
-  let currentAnimal = '';
-  let currentState = 'idle';
-  let frameIndex = 0;
-  let lastFrameTime = 0;
+var GLOW = {
+  idle:'rgba(233,69,96,0.3)', thinking:'rgba(139,92,246,0.55)',
+  coding:'rgba(59,130,246,0.55)', reading:'rgba(234,179,8,0.45)',
+  searching:'rgba(249,115,22,0.55)', browsing:'rgba(6,182,212,0.55)',
+  executing:'rgba(16,185,129,0.55)', planning:'rgba(139,92,246,0.45)',
+  waiting:'rgba(255,170,68,0.65)', success:'rgba(74,222,128,0.65)',
+  error:'rgba(248,113,113,0.65)', sleeping:'rgba(100,116,139,0.25)',
+  greeting:'rgba(251,191,36,0.55)'
+};
 
-  // Make window interactive on hover (for dragging and right-click)
-  document.addEventListener('mouseenter', () => {
-    if (window.electronAPI) return;
-    // Electron handles this via setIgnoreMouseEvents with forward
-  });
+function dbg(msg) { stateLabel.textContent = msg; }
 
-  const GLOW_COLORS = {
-    idle:      'rgba(233, 69, 96, 0.2)',
-    thinking:  'rgba(139, 92, 246, 0.4)',
-    coding:    'rgba(59, 130, 246, 0.4)',
-    reading:   'rgba(234, 179, 8, 0.3)',
-    searching: 'rgba(249, 115, 22, 0.4)',
-    browsing:  'rgba(6, 182, 212, 0.4)',
-    executing: 'rgba(16, 185, 129, 0.4)',
-    planning:  'rgba(139, 92, 246, 0.3)',
-    waiting:   'rgba(255, 170, 68, 0.5)',
-    success:   'rgba(74, 222, 128, 0.5)',
-    error:     'rgba(248, 113, 113, 0.5)',
-    mcp:       'rgba(168, 85, 247, 0.4)',
-    skill:     'rgba(251, 191, 36, 0.4)',
-    sleeping:  'rgba(100, 116, 139, 0.15)',
-    greeting:  'rgba(251, 191, 36, 0.4)',
-  };
-
-  const ACTIVE_STATES = new Set([
-    'thinking', 'coding', 'reading', 'searching', 'browsing',
-    'executing', 'planning', 'mcp', 'skill',
-  ]);
-
-  // Fetch sprites
-  async function fetchSprites() {
-    try {
-      const res = await fetch(`${DAEMON_URL}/sprites`);
-      const data = await res.json();
-      sprites = data.sprites;
-      frameSpeeds = data.frameSpeeds || {};
-      stateLabels = data.stateLabels || {};
-    } catch (e) {
-      setTimeout(fetchSprites, 3000);
-    }
+function setAnimal(a) {
+  animal = a;
+  animalName.textContent = a;
+  var sd = sprites && sprites[a];
+  if (sd && sd.states && sd.states.idle && sd.states.idle[0]) {
+    canvas.width  = sd.states.idle[0][0].length;
+    canvas.height = sd.states.idle[0].length;
   }
+}
 
-  // WebSocket
-  function connectWS() {
-    const ws = new WebSocket(WS_URL);
+function setState(s) {
+  state = s; frameIdx = 0; lastTime = 0;
+  stateLabel.textContent = s;
+  canvas.style.filter = 'drop-shadow(0 0 12px ' + (GLOW[s] || GLOW.idle) + ')';
+  card.classList.remove('bounce','shake','pulse');
+  void card.offsetWidth;
+  if (s === 'error') card.classList.add('shake');
+  else if (s === 'sleeping') card.classList.add('pulse');
+  else card.classList.add('bounce');
+  bubble.classList.toggle('visible', s === 'waiting');
+}
 
-    ws.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data);
-        if (msg.animal) currentAnimal = msg.animal;
-        if (msg.state && msg.state !== currentState) {
-          const prevState = currentState;
-          currentState = msg.state;
-          frameIndex = 0;
-          lastFrameTime = 0;
-          onStateChange(prevState, currentState);
-        }
-      } catch (e) {}
-    };
-
-    ws.onclose = () => setTimeout(connectWS, 2000);
-    ws.onerror = () => ws.close();
-  }
-
-  function onStateChange(prev, next) {
-    // Subtle drop-shadow on canvas per state
-    const color = GLOW_COLORS[next] || GLOW_COLORS.idle;
-    canvas.style.filter = `drop-shadow(0 0 8px ${color})`;
-
-    // Bounce effect
-    popup.classList.remove('bouncing', 'shaking', 'sleeping');
-    void popup.offsetWidth; // force reflow
-
-    if (next === 'error') {
-      popup.classList.add('shaking');
-    } else if (next === 'sleeping') {
-      popup.classList.add('sleeping');
-    } else {
-      popup.classList.add('bouncing');
-    }
-
-    // Speech bubble for waiting
-    if (next === 'waiting') {
-      speechBubble.classList.add('visible');
-    } else {
-      speechBubble.classList.remove('visible');
-    }
-
-    // State label — show briefly on change
-    const label = stateLabels[next] || next;
-    stateLabel.textContent = label;
-    stateLabel.classList.add('visible');
-    setTimeout(() => stateLabel.classList.remove('visible'), 2000);
-  }
-
-  // Rendering
-  function drawFrame(spriteData, palette, frame) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    for (let y = 0; y < frame.length; y++) {
-      const row = frame[y];
-      for (let x = 0; x < row.length; x++) {
-        const ch = row[x];
-        if (ch === '0') continue;
-
-        const colorIndex = parseInt(ch, 16) - 1;
-        if (colorIndex >= 0 && colorIndex < palette.length) {
-          ctx.fillStyle = palette[colorIndex];
-          ctx.fillRect(x * PIXEL_SCALE, y * PIXEL_SCALE, PIXEL_SCALE, PIXEL_SCALE);
-        }
+function drawFrame(frames) {
+  var sd = sprites[animal];
+  if (!sd) return;
+  var frame = frames[frameIdx % frames.length];
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (var y = 0; y < frame.length; y++) {
+    var row = frame[y];
+    for (var x = 0; x < row.length; x++) {
+      var ch = row[x];
+      if (ch === '0') continue;
+      var ci = parseInt(ch, 16) - 1;
+      if (ci >= 0 && ci < sd.palette.length) {
+        ctx.fillStyle = sd.palette[ci];
+        ctx.fillRect(x, y, 1, 1);
       }
     }
   }
+}
 
-  function animate(timestamp) {
-    requestAnimationFrame(animate);
-
-    if (!sprites || !currentAnimal) return;
-
-    const spriteData = sprites[currentAnimal] || sprites['claude'] || Object.values(sprites)[0];
-    if (!spriteData) return;
-
-    const frames = spriteData.states[currentState] || spriteData.states.idle;
-    if (!frames || frames.length === 0) return;
-
-    const speed = frameSpeeds[currentState] || 400;
-
-    if (timestamp - lastFrameTime >= speed) {
-      lastFrameTime = timestamp;
-      frameIndex = (frameIndex + 1) % frames.length;
-      drawFrame(spriteData, spriteData.palette, frames[frameIndex]);
-    }
+function tick(ts) {
+  requestAnimationFrame(tick);
+  if (!sprites || !animal) return;
+  var sd = sprites[animal] || Object.values(sprites)[0];
+  if (!sd) return;
+  var frames = (sd.states && (sd.states[state] || sd.states.idle));
+  if (!frames || !frames.length) return;
+  if (ts - lastTime >= 400) {
+    lastTime = ts;
+    frameIdx = (frameIdx + 1) % frames.length;
+    drawFrame(frames);
   }
+}
 
-  // Init
-  async function init() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    await fetchSprites();
-    connectWS();
-    canvas.style.filter = `drop-shadow(0 0 8px ${GLOW_COLORS.idle})`;
-    requestAnimationFrame(animate);
-  }
+function connectWS() {
+  var ws = new WebSocket('ws://localhost:' + WS_PORT);
+  ws.onmessage = function(e) {
+    try {
+      var msg = JSON.parse(e.data);
+      if (msg.animal && msg.animal !== animal) setAnimal(msg.animal);
+      if (msg.state) setState(msg.state);
+    } catch(err) {}
+  };
+  ws.onopen  = function() { if (!animal) dbg('connected'); };
+  ws.onclose = function() { setTimeout(connectWS, 2000); };
+  ws.onerror = function() { ws.close(); };
+}
 
-  init();
-})();
+function loadStatus() {
+  return fetch(BASE + '/status')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.animal) setAnimal(d.animal);
+      if (d.state)  setState(d.state);
+    })
+    .catch(function(e) { dbg('status err: ' + e.message); });
+}
+
+function loadSprites() {
+  dbg('loading...');
+  fetch(BASE + '/sprites')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      sprites = d.sprites;
+      dbg('sprites ok');
+      return loadStatus();
+    })
+    .then(function() {
+      connectWS();
+      requestAnimationFrame(tick);
+    })
+    .catch(function(e) {
+      dbg('err: ' + e.message);
+      setTimeout(loadSprites, 3000);
+    });
+}
+
+// draw test square immediately to verify canvas works
+ctx.fillStyle = '#e94560';
+ctx.fillRect(0, 0, 8, 8);
+ctx.fillStyle = '#8b5cf6';
+ctx.fillRect(8, 0, 8, 8);
+ctx.fillStyle = '#3b82f6';
+ctx.fillRect(0, 8, 8, 8);
+ctx.fillStyle = '#10b981';
+ctx.fillRect(8, 8, 8, 8);
+
+// Force exact window size (Edge may ignore --window-size flag)
+window.resizeTo(164, 260);
+
+canvas.style.filter = 'drop-shadow(0 0 10px rgba(233,69,96,0.3))';
+loadSprites();
 </script>
 </body>
 </html>

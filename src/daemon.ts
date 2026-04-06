@@ -37,6 +37,9 @@ app.use((_req, res, next) => {
 // Try dist/web first (production), then src/web (development)
 app.use(express.static(join(__dirname, 'web')));
 app.use(express.static(join(__dirname, '..', 'src', 'web')));
+// Also serve popup.html from electron dir (used by Edge app-mode popup in WSL)
+app.use(express.static(join(__dirname, 'electron')));
+app.use(express.static(join(__dirname, '..', 'src', 'electron')));
 
 const wss = new WebSocketServer({ port: WS_PORT });
 const clients = new Set<WebSocket>();

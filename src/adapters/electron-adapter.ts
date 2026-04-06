@@ -1,8 +1,17 @@
 import { spawn } from 'child_process';
 import { resolve, join, dirname } from 'path';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import type { TerminalAdapter } from './terminal-adapter.js';
+
+function isWSL(): boolean {
+  if (process.platform !== 'linux') return false;
+  try { return readFileSync('/proc/version', 'utf8').toLowerCase().includes('microsoft'); } catch { return false; }
+}
+
+function hasDisplay(): boolean {
+  return !!process.env.DISPLAY || !!process.env.WAYLAND_DISPLAY;
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -14,6 +23,7 @@ export class ElectronAdapter implements TerminalAdapter {
 
   isAvailable(): boolean {
     try {
+      if (isWSL()) return false; // WSL: use Edge app mode instead (more stable than Electron/WSLg)
       return this.getElectronBin() !== null;
     } catch {
       return false;

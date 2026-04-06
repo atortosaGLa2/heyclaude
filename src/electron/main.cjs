@@ -10,7 +10,20 @@
 
 const { app, BrowserWindow, Menu, screen } = require('electron');
 const { join } = require('path');
-const { existsSync } = require('fs');
+const { existsSync, readFileSync } = require('fs');
+
+// WSLg / headless environments need software rendering
+const isWSL = (() => {
+  try { return readFileSync('/proc/version', 'utf8').toLowerCase().includes('microsoft'); } catch { return false; }
+})();
+if (isWSL) {
+  app.commandLine.appendSwitch('disable-gpu');
+  app.commandLine.appendSwitch('disable-software-rasterizer');
+  app.commandLine.appendSwitch('no-sandbox');
+  app.commandLine.appendSwitch('disable-dev-shm-usage');
+  app.commandLine.appendSwitch('in-process-gpu');
+  app.commandLine.appendSwitch('single-process');
+}
 
 const WINDOW_SIZE = 120;
 const DAEMON_PORT = parseInt(process.env.HEYCLAUDE_DAEMON_PORT || '7337', 10);

@@ -139,36 +139,27 @@ info "Building TypeScript..."
 npm run build
 success "Build complete"
 
-# ── 4. Link CLI to ~/.local/bin (no sudo needed) ────────────────────────────
+# ── 4. Copy everything to plugin dir (standalone install) ───────────────────
 echo ""
-info "Linking heyclaude CLI to ~/.local/bin..."
-mkdir -p "$HOME/.local/bin"
-ln -sf "$SCRIPT_DIR/bin/heyclaude.js" "$HOME/.local/bin/heyclaude"
-chmod +x "$HOME/.local/bin/heyclaude"
-# Ensure ~/.local/bin is in PATH for this session
-export PATH="$HOME/.local/bin:$PATH"
-success "CLI linked to ~/.local/bin/heyclaude"
-
-# Check if ~/.local/bin is in PATH permanently
-if ! echo "$PATH" | tr ':' '\n' | grep -q "$HOME/.local/bin"; then
-  warn "~/.local/bin may not be in your PATH."
-  echo "  Add this to your shell profile (~/.bashrc, ~/.zshrc, etc.):"
-  echo "    export PATH=\"\$HOME/.local/bin:\$PATH\""
-fi
-
-# ── 5. Create plugin directory ──────────────────────────────────────────────
-echo ""
-info "Installing Claude Code plugin to $PLUGIN_DIR..."
+info "Installing to $PLUGIN_DIR (standalone)..."
 mkdir -p "$PLUGIN_DIR/hooks"
+mkdir -p "$PLUGIN_DIR/bin"
+
+# Copy runtime files
+cp -r "$SCRIPT_DIR/dist"         "$PLUGIN_DIR/"
+cp -r "$SCRIPT_DIR/node_modules" "$PLUGIN_DIR/"
+cp    "$SCRIPT_DIR/package.json" "$PLUGIN_DIR/"
+cp    "$SCRIPT_DIR/bin/heyclaude.js" "$PLUGIN_DIR/bin/"
+chmod +x "$PLUGIN_DIR/bin/heyclaude.js"
 
 # Copy hooks
 cp "$SCRIPT_DIR/hooks/hooks.json"   "$PLUGIN_DIR/hooks/"
 cp "$SCRIPT_DIR/hooks/pre-tool.js"  "$PLUGIN_DIR/hooks/"
 cp "$SCRIPT_DIR/hooks/post-tool.js" "$PLUGIN_DIR/hooks/"
 cp "$SCRIPT_DIR/hooks/prompt.js"    "$PLUGIN_DIR/hooks/"
-success "Hook files copied"
+success "Files copied to plugin dir"
 
-# Write the plugin manifest pointing back to the source
+# Write plugin manifest
 cat > "$PLUGIN_DIR/plugin.json" <<EOF
 {
   "name": "heyclaude",
@@ -179,7 +170,22 @@ cat > "$PLUGIN_DIR/plugin.json" <<EOF
 EOF
 success "Plugin manifest created"
 
-# ── 6. Register hooks in Claude Code settings ───────────────────────────────
+# ── 5. Link CLI to ~/.local/bin ──────────────────────────────────────────────
+echo ""
+info "Linking heyclaude CLI to ~/.local/bin..."
+mkdir -p "$HOME/.local/bin"
+ln -sf "$PLUGIN_DIR/bin/heyclaude.js" "$HOME/.local/bin/heyclaude"
+chmod +x "$HOME/.local/bin/heyclaude"
+export PATH="$HOME/.local/bin:$PATH"
+success "CLI linked to ~/.local/bin/heyclaude"
+
+if ! echo "$PATH" | tr ':' '\n' | grep -q "$HOME/.local/bin"; then
+  warn "~/.local/bin may not be in your PATH."
+  echo "  Add this to your shell profile (~/.bashrc, ~/.zshrc, etc.):"
+  echo "    export PATH=\"\$HOME/.local/bin:\$PATH\""
+fi
+
+# ── 6. Register hooks in Claude Code settings (pointing to plugin dir) ──────
 if [ "$USE_WIN_PATHS" = true ]; then
   SETTINGS="$WIN_HOME_WSL/.claude/settings.json"
 else
