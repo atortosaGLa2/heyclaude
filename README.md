@@ -43,7 +43,7 @@ The auto-selection order is: **Electron → tmux → standalone**. You can overr
 
 ```bash
 # 1. Clone and install
-git clone https://github.com/bta/heyclaude.git && cd heyclaude
+git clone https://github.com/atortosaGLa2/heyclaude.git && cd heyclaude
 ./install.sh
 
 # 2. Start the mascot
@@ -55,7 +55,7 @@ heyclaude start
 To auto-start on every terminal session, add this to your `~/.bashrc` or `~/.zshrc`:
 
 ```bash
-# heyclaude — start mascot in background if not already running
+# heyclaude — start mascot in background
 (sleep 1 && heyclaude start) &>/dev/null &
 ```
 
@@ -67,13 +67,13 @@ To auto-start on every terminal session, add this to your `~/.bashrc` or `~/.zsh
 
 - **Node.js 18+**
 - **tmux** *(optional — for tmux pane mode on macOS/Linux)*
-- **Electron** *(optional — for floating popup on macOS/Linux)*
-- **Microsoft Edge** *(optional — for floating popup on WSL2)*
+- **Electron** *(bundled — for floating popup on macOS/Linux)*
+- **Microsoft Edge** *(optional — for floating popup on WSL2, usually pre-installed on Windows 10/11)*
 
 ### macOS / Linux
 
 ```bash
-git clone https://github.com/bta/heyclaude.git && cd heyclaude
+git clone https://github.com/atortosaGLa2/heyclaude.git && cd heyclaude
 ./install.sh
 ```
 
@@ -91,20 +91,12 @@ export PATH="$HOME/.local/bin:$PATH"
 
 ### WSL2 (Windows Subsystem for Linux)
 
-The setup is the same as Linux. When you run `heyclaude start`, the mascot appears as a small floating window using Microsoft Edge in app-mode.
-
-**Requirements for WSL2 popup:**
-- Microsoft Edge installed on Windows (usually pre-installed on Windows 10/11)
-- No extra configuration needed — heyclaude detects WSL automatically
+Same install as Linux. heyclaude detects WSL automatically and opens the mascot as a floating Microsoft Edge window instead of Electron.
 
 ```bash
 ./install.sh
 heyclaude start
 ```
-
-The popup appears as a small 164×260 pixel card on your Windows desktop showing the animated mascot.
-
-**Closing the popup:** Right-click the Edge icon in the taskbar → Close window, or run `heyclaude stop`.
 
 ### Windows (native)
 
@@ -114,7 +106,7 @@ npm run build
 node bin\heyclaude.js start
 ```
 
-Register hooks manually: copy the patterns from `hooks/hooks.json` into `%APPDATA%\.claude\settings.json`, updating the paths to point at your installation directory.
+Register hooks manually: copy the entries from `hooks/hooks.json` into `%APPDATA%\.claude\settings.json`, adjusting paths to your installation directory.
 
 ---
 
@@ -122,22 +114,106 @@ Register hooks manually: copy the patterns from `hooks/hooks.json` into `%APPDAT
 
 ### Commands
 
+| Command | Description |
+|---|---|
+| `heyclaude start` | Start daemon + open mascot (auto-detects best display mode) |
+| `heyclaude stop` | Stop daemon + close mascot |
+| `heyclaude status` | Print current daemon state as JSON |
+| `heyclaude animal` | Show which animal this session was assigned |
+| `heyclaude animals` | List all 83 available sprites with emoji |
+| `heyclaude preview <name>` | Render one frame of a sprite in the terminal |
+| `heyclaude demo` | Cycle through all animation states (2 s each) |
+| `heyclaude config show` | Display current config as JSON |
+| `heyclaude config set <key> <value>` | Set a config value |
+| `heyclaude config reset` | Reset config to defaults |
+| `heyclaude render` | Run terminal render loop (internal — used inside tmux pane) |
+
+### Start options
+
 ```bash
-heyclaude start              # Start daemon + open mascot popup/pane
-heyclaude stop               # Stop daemon + close mascot
-heyclaude status             # Print current state as JSON
-heyclaude animal             # Show which animal this session got
-heyclaude render             # Run the terminal render loop (internal use)
+heyclaude start                      # auto-detect display mode (default)
+heyclaude start --mode popup         # force Electron floating window
+heyclaude start --mode terminal      # force tmux pane or standalone terminal
+heyclaude start --mode web           # daemon only, open browser manually
+heyclaude start --animal fox         # override animal for this session
+heyclaude start --theme neon         # override color theme (terminal mode)
+heyclaude start --position left      # tmux pane on left instead of right
 ```
 
-### Display Mode Flags
+---
+
+## Behaviour per platform
+
+### macOS
+
+Auto-selection order: **Electron popup → tmux pane → standalone terminal**
+
+| Situation | What happens |
+|---|---|
+| Electron installed (bundled) | Small floating window appears, always on top, dark card with animated mascot |
+| Inside tmux, no Electron | Mascot renders as half-block pixel art in a side pane |
+| No tmux, no Electron | Opens a new Terminal.app window running the render loop |
+| iTerm2 detected | Opens a new iTerm2 window instead of Terminal.app |
+
+The web UI is always available at `http://localhost:7337` regardless of display mode.
+
+**Closing:** `heyclaude stop`, or right-click Dock icon → Quit (Electron), or close the tmux pane (`Ctrl+b x`).
+
+---
+
+### Linux (with display server)
+
+Auto-selection order: **Electron popup → tmux pane → standalone terminal**
+
+| Situation | What happens |
+|---|---|
+| Electron installed (bundled) + `$DISPLAY` set | Floating Electron window |
+| Inside tmux | Half-block pixel art side pane |
+| No tmux, no display | Opens a new terminal window (`x-terminal-emulator`, `gnome-terminal`, or `xterm`) |
+
+**Closing:** `heyclaude stop`.
+
+---
+
+### WSL2 (Windows Subsystem for Linux)
+
+Electron is **disabled** in WSL (native libs missing, GPU issues). heyclaude uses Microsoft Edge in app-mode instead.
+
+Auto-selection order: **tmux pane → Edge popup (standalone)**
+
+| Situation | What happens |
+|---|---|
+| Inside tmux | Half-block pixel art side pane inside WSL terminal |
+| Not in tmux | Writes mascot HTML to `C:\Users\Public\heyclaude-popup.html` and opens it in Edge `--app` mode — a 164×260 px floating card on your Windows desktop |
+| Edge not found | Falls back to opening `http://localhost:7337` in the default browser |
+
+> **Note:** The Edge popup connects to the daemon running inside WSL via `localhost`. The popup HTML is written fresh to disk on every `heyclaude start`, bypassing all browser caching.
+
+**Closing the Edge popup:** Right-click the Edge taskbar icon → Close window, or run `heyclaude stop` from WSL.
+
+---
+
+### Windows (native)
+
+No Electron, no tmux. heyclaude uses the standalone adapter.
+
+| Situation | What happens |
+|---|---|
+| Any | Opens a new `cmd.exe` window running the render loop |
+
+**Closing:** `heyclaude stop` or close the cmd window.
+
+---
+
+### Anywhere — Web UI
+
+The daemon always serves a browser UI at `http://localhost:7337`. Useful for:
+- SSH sessions (forward port 7337)
+- Containers with no display
+- Watching multiple sessions from a single browser tab
 
 ```bash
-heyclaude start --mode auto        # Auto-detect (default)
-heyclaude start --mode popup       # Force Electron popup
-heyclaude start --mode tmux        # Force tmux side-pane
-heyclaude start --mode terminal    # Force standalone terminal window
-heyclaude start --mode web         # Daemon only — open browser manually
+heyclaude start --mode web   # daemon only, no terminal window opened
 ```
 
 ### How It Works
@@ -154,8 +230,8 @@ HTTP POST → Daemon (localhost:7337)
     ▼
 WebSocket broadcast (localhost:7338)
     │
-    ├── Popup window (Electron or Edge app-mode)
-    ├── tmux pane (terminal half-block renderer)
+    ├── Floating window (Electron on macOS/Linux · Edge on WSL)
+    ├── tmux pane (half-block terminal renderer)
     └── Web UI (http://localhost:7337)
 ```
 
