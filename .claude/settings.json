@@ -1,0 +1,48 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/Volumes/Abelore SSD/heyclaude/hooks/pre-tool.js\"",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/Volumes/Abelore SSD/heyclaude/hooks/post-tool.js\"",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/Volumes/Abelore SSD/heyclaude/hooks/prompt.js\"",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/Volumes/Abelore SSD/heyclaude/hooks/prompt.js\" --waiting",
+            "timeout": 2
+          }
+        ]
+      }
+    ]
+  }
+}
