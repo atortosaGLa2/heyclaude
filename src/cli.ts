@@ -295,6 +295,11 @@ async function cmdStart() {
     console.log(`[heyclaude] daemon started (pid=${daemon.pid} session=${sessionId.slice(0, 8)} port=${daemonPort!})`);
   }
 
+  // Register TTY → sessionId so hooks can find the daemon without process-tree walk
+  const { getCurrentTty, registerTty } = await import('./registry.js');
+  const tty = getCurrentTty();
+  if (tty) registerTty(tty, sessionId);
+
   // Wait briefly for daemon to boot and register itself
   await sleep(600);
 
@@ -387,9 +392,11 @@ async function stopDaemon(sessionId: string, daemonPort: number, pid: number) {
     }
   }
 
-  // Clean up registry manually (daemon may not have cleaned up)
-  const { unregisterSession } = await import('./registry.js');
+  // Clean up registry and TTY map
+  const { unregisterSession, unregisterTty, getCurrentTty } = await import('./registry.js');
   await unregisterSession(sessionId);
+  const tty = getCurrentTty();
+  if (tty) unregisterTty(tty);
 }
 
 async function cmdRender() {

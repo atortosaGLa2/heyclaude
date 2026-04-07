@@ -10,8 +10,9 @@ import {
   readFileSync, writeFileSync, mkdirSync,
   openSync, writeSync, closeSync, unlinkSync,
 } from 'fs';
+import { readlinkSync } from 'fs';
 import { createServer } from 'net';
-import { getConfigDir, getRegistryPath, getRegistryLockPath } from './config.js';
+import { getConfigDir, getRegistryPath, getRegistryLockPath, getTtyMapPath } from './config.js';
 
 export interface RegistryEntry {
   sessionId: string;
@@ -151,6 +152,47 @@ export async function unregisterSession(sessionId: string): Promise<void> {
 /** Fast lookup without locking. Returns null if session not found. */
 export function lookupSession(sessionId: string): RegistryEntry | null {
   return readRegistryRaw()[sessionId] ?? null;
+}
+
+// ── TTY → session mapping (fast hook lookup) ──────────────────────────────────
+
+type TtyMap = Record<string, string>; // tty path → sessionId
+
+function readTtyMapRaw(): TtyMap {
+  try {
+    const raw = readFileSync(getTtyMapPath(), 'utf8');
+    const parsed = JSON.parse(raw);
+    return (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) ? parsed : {};
+  } catch { return {}; }
+}
+
+function writeTtyMap(map: TtyMap): void {
+  mkdirSync(getConfigDir(), { recursive: true });
+  writeFileSync(getTtyMapPath(), JSON.stringify(map, null, 2) + '\n', 'utf8');
+}
+
+/** Get the TTY path for the current process (/dev/pts/N or similar). Returns null if unavailable. */
+export function getCurrentTty(): string | null {
+  try { return readlinkSync('/proc/self/fd/0'); } catch { return null; }
+}
+
+/** Write the TTY → sessionId mapping for the current process's TTY. */
+export function registerTty(tty: string, sessionId: string): void {
+  const map = readTtyMapRaw();
+  map[tty] = sessionId;
+  writeTtyMap(map);
+}
+
+/** Remove a TTY entry (called on stop). */
+export function unregisterTty(tty: string): void {
+  const map = readTtyMapRaw();
+  delete map[tty];
+  writeTtyMap(map);
+}
+
+/** Look up a session ID from a TTY path. Returns null if not found. */
+export function lookupSessionByTty(tty: string): string | null {
+  return readTtyMapRaw()[tty] ?? null;
 }
 
 /** Remove registry entries whose daemon process is no longer alive. */

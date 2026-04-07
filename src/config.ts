@@ -67,6 +67,11 @@ export function getPidDir(): string {
   return join(getConfigDir(), 'pids');
 }
 
+/** TTY → sessionId mapping file (fast lookup for hooks) */
+export function getTtyMapPath(): string {
+  return join(getConfigDir(), 'tty-map.json');
+}
+
 /**
  * Parse a boolean from an environment variable string.
  * "true" or "1" => true, anything else => false.

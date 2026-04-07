@@ -7,13 +7,14 @@
  * without requiring TypeScript or build artifacts.
  */
 
-import { readFileSync } from 'fs';
+import { readFileSync, readlinkSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { execFileSync } from 'child_process';
 
 const SESSIONS_DIR   = join(homedir(), '.claude', 'sessions');
 const REGISTRY_PATH  = join(homedir(), '.config', 'heyclaude', 'registry.json');
+const TTY_MAP_PATH   = join(homedir(), '.config', 'heyclaude', 'tty-map.json');
 const MAX_DEPTH      = 10;
 
 // ── Process tree walking ──────────────────────────────────────────────────────
@@ -78,6 +79,20 @@ function readRegistry() {
   }
 }
 
+function readTtyMap() {
+  try {
+    const raw = readFileSync(TTY_MAP_PATH, 'utf8');
+    const parsed = JSON.parse(raw);
+    return (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function getCurrentTty() {
+  try { return readlinkSync('/proc/self/fd/0'); } catch { return null; }
+}
+
 // ── Public export ─────────────────────────────────────────────────────────────
 
 /**
@@ -94,6 +109,18 @@ export function resolveEventUrl() {
     let sessionId = process.env.CLAUDE_SESSION_ID;
 
     if (!sessionId || sessionId === 'default') {
+      // 1. TTY-based lookup (fastest, most reliable)
+      const tty = getCurrentTty();
+      if (tty) {
+        const ttyMap = readTtyMap();
+        if (ttyMap[tty] && ttyMap[tty] !== 'default') {
+          sessionId = ttyMap[tty];
+        }
+      }
+    }
+
+    if (!sessionId || sessionId === 'default') {
+      // 2. Process tree walk fallback
       const claudePid = findClaudePid();
       if (claudePid) {
         try {

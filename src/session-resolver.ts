@@ -7,11 +7,11 @@
  * Works on Linux/WSL (via /proc) and macOS (via ps).
  */
 
-import { readFileSync } from 'fs';
+import { readFileSync, readlinkSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { execFileSync } from 'child_process';
-import { readRegistry } from './registry.js';
+import { readRegistry, lookupSessionByTty } from './registry.js';
 
 const SESSIONS_DIR = join(homedir(), '.claude', 'sessions');
 const MAX_DEPTH = 10;
@@ -84,13 +84,22 @@ export function sessionIdFromClaudePid(claudePid: number): string | null {
  *
  * Resolution order:
  * 1. CLAUDE_SESSION_ID env var (future-proofing / explicit override)
- * 2. Process tree walk → session file
- * 3. null (caller decides the fallback)
+ * 2. TTY-based lookup (fast, reliable — set by heyclaude start)
+ * 3. Process tree walk → session file
+ * 4. null (caller decides the fallback)
  */
 export function resolveSessionId(): string | null {
   const envId = process.env.CLAUDE_SESSION_ID;
   if (envId && envId !== 'default') return envId;
 
+  // TTY-based lookup: the hook runs in the same TTY as Claude Code
+  try {
+    const tty = readlinkSync('/proc/self/fd/0');
+    const ttySession = lookupSessionByTty(tty);
+    if (ttySession && ttySession !== 'default') return ttySession;
+  } catch { /* TTY not available */ }
+
+  // Fallback: process tree walk
   const claudePid = findClaudePid();
   if (!claudePid) return null;
   return sessionIdFromClaudePid(claudePid);
