@@ -18,7 +18,7 @@
  *   heyclaude --version / -v    Show version
  */
 
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join, resolve } from 'path';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
@@ -301,9 +301,26 @@ async function cmdStart() {
   await openDisplay(daemonPort!, wsPort!);
 
   const { animalFromSessionId } = await import('./sprites/index.js');
-  const animal = animalFromSessionId(sessionId);
+  const animal = (typeof flags['animal'] === 'string' ? flags['animal'] : null) ?? animalFromSessionId(sessionId);
   console.log(`[heyclaude] your mascot: ${animal}`);
   console.log(`[heyclaude] web UI: http://localhost:${daemonPort!}`);
+}
+
+/** Kill the tmux pane for a given daemon port, regardless of current tmux context. */
+function closeTmuxPane(daemonPort: number): void {
+  try {
+    const paneName = `heyclaude-${daemonPort}`;
+    const lines = execSync(`tmux list-panes -a -F '#{pane_id} #{pane_title}'`, {
+      encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim().split('\n');
+    for (const line of lines) {
+      const spaceIdx = line.indexOf(' ');
+      if (spaceIdx === -1) continue;
+      if (line.slice(spaceIdx + 1) === paneName) {
+        try { execSync(`tmux kill-pane -t ${line.slice(0, spaceIdx)}`, { stdio: 'ignore' }); } catch { /* */ }
+      }
+    }
+  } catch { /* tmux not running or pane already gone */ }
 }
 
 async function cmdStop() {
@@ -346,12 +363,9 @@ async function cmdStop() {
 }
 
 async function stopDaemon(sessionId: string, daemonPort: number, pid: number) {
-  // Close the tmux pane for this specific session
-  const { selectAdapter } = await import('./adapters/index.js');
-  const adapter = selectAdapter() as any;
-  if (typeof adapter.closeSession === 'function') {
-    adapter.closeSession(daemonPort);
-  }
+  // Close the tmux pane for this session — done directly via tmux so it works
+  // regardless of whether the stop command is run from inside tmux or not.
+  closeTmuxPane(daemonPort);
 
   // Try HTTP graceful stop first (daemon unregisters itself)
   try {
