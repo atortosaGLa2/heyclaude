@@ -95,8 +95,10 @@ export function resolveSessionId(): string | null {
   // TTY-based lookup: the hook runs in the same TTY as Claude Code
   try {
     const tty = readlinkSync('/proc/self/fd/0');
-    const ttySession = lookupSessionByTty(tty);
-    if (ttySession && ttySession !== 'default') return ttySession;
+    if (tty.startsWith('/dev/pts/') || tty.startsWith('/dev/tty')) {
+      const ttySession = lookupSessionByTty(tty);
+      if (ttySession && ttySession !== 'default') return ttySession;
+    }
   } catch { /* TTY not available */ }
 
   // Fallback: process tree walk

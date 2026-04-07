@@ -173,7 +173,12 @@ function writeTtyMap(map: TtyMap): void {
 
 /** Get the TTY path for the current process (/dev/pts/N or similar). Returns null if unavailable. */
 export function getCurrentTty(): string | null {
-  try { return readlinkSync('/proc/self/fd/0'); } catch { return null; }
+  try {
+    const tty = readlinkSync('/proc/self/fd/0');
+    // Only accept real terminal devices, not /dev/null or pipes
+    if (tty.startsWith('/dev/pts/') || tty.startsWith('/dev/tty')) return tty;
+    return null;
+  } catch { return null; }
 }
 
 /** Write the TTY → sessionId mapping for the current process's TTY. */
