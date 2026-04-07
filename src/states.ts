@@ -32,13 +32,14 @@ export function hookEventToState(event: string, toolName?: string): AnimationSta
   }
 }
 
-/** How long each state persists before falling back to idle (ms) */
+/** How long each state persists before falling back to baseState (ms).
+ *  States NOT listed here stay until explicitly changed by a hook event. */
 export const STATE_TIMEOUTS: Partial<Record<AnimationState, number>> = {
   success:  2000,
   error:    3000,
-  thinking: 30000,
-  // waiting has NO timeout — stays until user acts
   greeting: 3000,
+  // thinking: no timeout — stays until Stop hook fires (baseState → waiting)
+  // waiting:  no timeout — stays until next UserPromptSubmit
 };
 
 /** Duration of idle before switching to sleeping (ms) */

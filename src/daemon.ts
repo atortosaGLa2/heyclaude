@@ -75,6 +75,10 @@ const daemonState: DaemonState = {
   label: 'hey!',
 };
 
+// The "resting" state between tool calls — updated by UserPromptSubmit and Stop events.
+// Transient states (success, error, tool states) revert here instead of hardcoded 'idle'.
+let baseState: AnimationState = 'idle';
+let baseLabel = '';
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
 
 setTimeout(() => {
@@ -90,8 +94,8 @@ function setState(state: AnimationState, label = '') {
   const timeout = STATE_TIMEOUTS[state];
   if (timeout !== undefined) {
     idleTimer = setTimeout(() => {
-      daemonState.state = 'idle';
-      daemonState.label = '';
+      daemonState.state = baseState;
+      daemonState.label = baseLabel;
       broadcast();
     }, timeout);
   }
@@ -118,7 +122,18 @@ wss.on('connection', (ws) => {
 app.post('/event', (req, res) => {
   const { event, tool, label } = req.body ?? {};
   const state = hookEventToState(event ?? 'PreToolUse', tool);
-  setState(state, label ?? tool ?? '');
+  const lbl   = label ?? tool ?? '';
+
+  // Update baseState so transient states (success/error/tool) revert correctly
+  if (event === 'UserPromptSubmit') {
+    baseState = 'thinking';
+    baseLabel = STATE_LABELS['thinking'] ?? 'thinking...';
+  } else if (event === 'Stop') {
+    baseState = 'waiting';
+    baseLabel = STATE_LABELS['waiting'] ?? 'your turn!';
+  }
+
+  setState(state, lbl);
   res.json({ ok: true, animal: daemonState.animal, state });
 });
 
