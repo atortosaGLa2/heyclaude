@@ -208,6 +208,20 @@ async function cmdStart() {
 
   const sessionId = await getSessionId();
 
+  // Autostart guard: when running as 'default' (no Claude ancestor, e.g. from .bashrc),
+  // skip if ANY session already has a live daemon. Prevents one mascot per terminal.
+  if (sessionId === 'default') {
+    const { readRegistry } = await import('./registry.js');
+    const registry = readRegistry();
+    for (const entry of Object.values(registry)) {
+      try {
+        await fetch(`http://localhost:${entry.daemonPort}/status`, { signal: AbortSignal.timeout(400) });
+        // A daemon is alive — don't open another one
+        process.exit(0);
+      } catch { /* dead entry, ignore */ }
+    }
+  }
+
   if (await isRunningForSession(sessionId)) {
     // Daemon is alive — check if display is also connected
     const { lookupSession } = await import('./registry.js');
