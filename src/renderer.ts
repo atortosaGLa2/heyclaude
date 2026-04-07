@@ -251,12 +251,16 @@ export function renderUI(
     ? fg('#22cc66')  // green for success
     : cAccent2;
   const labelContent = `${stateIcon} ${label}`;
-  const maxLabelW = innerW - 2 - (timeStr ? timeStr.length + 1 : 0);
+  const available  = innerW - 2; // 16 printable chars between │ borders
+  const timeW      = timeStr ? timeStr.length + 1 : 0; // +1 for separator space
+  const maxLabelW  = available - timeW;
   const labelTrunc = labelContent.slice(0, maxLabelW);
-  const gap = innerW - 2 - labelTrunc.length - (timeStr ? timeStr.length + 1 : 0);
-  const labelLine = cBg + cBorder + '│ ' + RESET +
+  const pad        = available - labelTrunc.length - (timeStr ? timeStr.length : 0);
+  const labelLine  = cBg + cBorder + '│ ' + RESET +
     cBg + stateColor + labelTrunc +
-    (timeStr ? ' '.repeat(Math.max(1, gap)) + cDim + timeStr : ' '.repeat(Math.max(0, innerW - 2 - labelTrunc.length))) +
+    (timeStr
+      ? ' '.repeat(pad) + cDim + timeStr
+      : ' '.repeat(pad)) +
     RESET + cBg + cBorder + ' │' + RESET + '\n';
 
   // ── Progress bar row ──
