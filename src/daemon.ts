@@ -37,9 +37,10 @@ function parseArgv(argv: string[]): Record<string, string> {
 
 const args = parseArgv(process.argv.slice(2));
 
-const SESSION_ID = args['session-id'] ?? process.env.CLAUDE_SESSION_ID ?? 'default';
-const HTTP_PORT  = parseInt(args['daemon-port'] ?? process.env.HEYCLAUDE_DAEMON_PORT ?? '7337', 10);
-const WS_PORT    = parseInt(args['ws-port']     ?? process.env.HEYCLAUDE_WS_PORT     ?? '7338', 10);
+const SESSION_ID    = args['session-id'] ?? process.env.CLAUDE_SESSION_ID ?? 'default';
+const ANIMAL_OVERRIDE = args['animal'] ?? process.env.HEYCLAUDE_ANIMAL ?? null;
+const HTTP_PORT     = parseInt(args['daemon-port'] ?? process.env.HEYCLAUDE_DAEMON_PORT ?? '7337', 10);
+const WS_PORT       = parseInt(args['ws-port']     ?? process.env.HEYCLAUDE_WS_PORT     ?? '7338', 10);
 
 export { HTTP_PORT, WS_PORT };
 
@@ -66,7 +67,7 @@ const clients = new Set<WebSocket>();
 
 // ── Shared state ──────────────────────────────────────────────────────────────
 
-const animal = animalFromSessionId(SESSION_ID);
+const animal = ANIMAL_OVERRIDE ?? animalFromSessionId(SESSION_ID);
 
 const daemonState: DaemonState = {
   animal,

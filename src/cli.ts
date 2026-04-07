@@ -257,12 +257,15 @@ async function cmdStart() {
   // Spawn daemon detached with session args
   const daemonScript = scriptPath('daemon');
   const runner = nodeRunner(daemonScript);
-  const daemon = spawn(runner.cmd, [
+  const daemonArgs = [
     ...runner.args,
     '--session-id', sessionId,
     '--daemon-port', String(daemonPort!),
     '--ws-port',     String(wsPort!),
-  ], {
+  ];
+  if (typeof flags['animal'] === 'string') daemonArgs.push('--animal', flags['animal']);
+
+  const daemon = spawn(runner.cmd, daemonArgs, {
     detached: true,
     stdio: 'ignore',
     env: {
