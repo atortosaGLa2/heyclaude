@@ -52,6 +52,21 @@ export function getConfigPath(): string {
   return join(getConfigDir(), 'config.json');
 }
 
+/** Registry file tracking all running daemon sessions */
+export function getRegistryPath(): string {
+  return join(getConfigDir(), 'registry.json');
+}
+
+/** Advisory lock file for registry writes */
+export function getRegistryLockPath(): string {
+  return join(getConfigDir(), 'registry.lock');
+}
+
+/** Directory for per-session PID files */
+export function getPidDir(): string {
+  return join(getConfigDir(), 'pids');
+}
+
 /**
  * Parse a boolean from an environment variable string.
  * "true" or "1" => true, anything else => false.

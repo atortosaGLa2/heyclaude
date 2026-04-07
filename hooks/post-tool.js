@@ -4,7 +4,8 @@
  * Sends 'success' or 'error' state based on whether the tool succeeded.
  */
 
-const DAEMON_URL = 'http://localhost:7337/event';
+import { resolveEventUrl } from './session-helper.js';
+
 const TIMEOUT_MS = 1500;
 
 async function main() {
@@ -17,25 +18,28 @@ async function main() {
   try {
     const data = JSON.parse(input);
     toolName = data.tool_name ?? data.toolName ?? 'unknown';
-    // Claude Code sets tool_response.is_error for failed tools
     isError  = data.tool_response?.is_error === true;
   } catch { /* ignore */ }
 
   const event = isError ? 'error' : 'PostToolUse';
-  const state = isError ? 'error'   : 'success';
 
-  try {
-    await fetch(DAEMON_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ event, tool: toolName, label: isError ? `✗ ${toolName}` : `✓ ${toolName}` }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-  } catch { /* daemon not running */ }
+  const url = resolveEventUrl();
+  if (url) {
+    try {
+      await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event,
+          tool: toolName,
+          label: isError ? `✗ ${toolName}` : `✓ ${toolName}`,
+        }),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+    } catch { /* daemon not running */ }
+  }
 
   process.stdout.write(JSON.stringify({}));
 }
 
-main().catch(() => {
-  process.stdout.write(JSON.stringify({}));
-});
+main().catch(() => { process.stdout.write(JSON.stringify({})); });

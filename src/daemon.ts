@@ -1,32 +1,53 @@
 /**
  * heyclaude daemon
  *
- * - HTTP server on :7337  → hook events API + web UI (single port)
- * - WebSocket server on :7338 → pushes state to render-loop / web UI
+ * - HTTP server on :PORT  → hook events API + web UI
+ * - WebSocket server on :WS_PORT → pushes state to render-loop / web UI
  *
- * Usage: heyclaude start  (called by install script / user)
+ * Args (take priority over env vars):
+ *   --session-id <id>     Claude Code session ID for this daemon
+ *   --daemon-port <n>     HTTP port (default 7337)
+ *   --ws-port <n>         WebSocket port (default 7338)
  */
 
 import express from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { detectAnimal } from './session.js';
+import { animalFromSessionId } from './sprites/index.js';
 import { hookEventToState, STATE_TIMEOUTS, FRAME_SPEED, STATE_LABELS } from './states.js';
 import { getAllSprites } from './sprites/index.js';
+import { registerSession, unregisterSession } from './registry.js';
 import type { DaemonState, AnimationState } from './types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const HTTP_PORT = parseInt(process.env.HEYCLAUDE_DAEMON_PORT ?? '7337', 10);
-const WS_PORT   = parseInt(process.env.HEYCLAUDE_WS_PORT ?? '7338', 10);
+// ── Argument parsing ──────────────────────────────────────────────────────────
+
+function parseArgv(argv: string[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i].startsWith('--') && argv[i + 1] && !argv[i + 1].startsWith('--')) {
+      out[argv[i].slice(2)] = argv[i + 1];
+      i++;
+    }
+  }
+  return out;
+}
+
+const args = parseArgv(process.argv.slice(2));
+
+const SESSION_ID = args['session-id'] ?? process.env.CLAUDE_SESSION_ID ?? 'default';
+const HTTP_PORT  = parseInt(args['daemon-port'] ?? process.env.HEYCLAUDE_DAEMON_PORT ?? '7337', 10);
+const WS_PORT    = parseInt(args['ws-port']     ?? process.env.HEYCLAUDE_WS_PORT     ?? '7338', 10);
 
 export { HTTP_PORT, WS_PORT };
+
+// ── Express + WebSocket setup ─────────────────────────────────────────────────
 
 const app = express();
 app.use(express.json());
 
-// CORS
 app.use((_req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', 'Content-Type');
@@ -34,7 +55,6 @@ app.use((_req, res, next) => {
 });
 
 // Serve web UI from the daemon itself (no separate server needed)
-// Try dist/web first (production), then src/web (development)
 app.use(express.static(join(__dirname, 'web')));
 app.use(express.static(join(__dirname, '..', 'src', 'web')));
 // Also serve popup.html from electron dir (used by Edge app-mode popup in WSL)
@@ -46,31 +66,26 @@ const clients = new Set<WebSocket>();
 
 // ── Shared state ──────────────────────────────────────────────────────────────
 
-const { animal, sessionId } = detectAnimal();
+const animal = animalFromSessionId(SESSION_ID);
 
 const daemonState: DaemonState = {
   animal,
-  sessionId,
+  sessionId: SESSION_ID,
   state: 'greeting',
   label: 'hey!',
 };
 
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
 
-// Auto-transition from greeting to idle after 3s
 setTimeout(() => {
-  if (daemonState.state === 'greeting') {
-    setState('idle', '');
-  }
+  if (daemonState.state === 'greeting') setState('idle', '');
 }, 3000);
 
 function setState(state: AnimationState, label = '') {
   daemonState.state = state;
   daemonState.label = label;
-
   broadcast();
 
-  // Auto-revert to idle after timeout
   if (idleTimer) clearTimeout(idleTimer);
   const timeout = STATE_TIMEOUTS[state];
   if (timeout !== undefined) {
@@ -108,7 +123,7 @@ app.post('/event', (req, res) => {
 });
 
 app.get('/status', (_req, res) => {
-  res.json(daemonState);
+  res.json({ ...daemonState, daemonPort: HTTP_PORT, wsPort: WS_PORT, clients: clients.size });
 });
 
 app.get('/sprites', (_req, res) => {
@@ -119,7 +134,6 @@ app.get('/sprites', (_req, res) => {
   });
 });
 
-/** POST /animal — switch the displayed animal (for testing) */
 app.post('/animal', (req, res) => {
   const { animal: newAnimal } = req.body ?? {};
   if (newAnimal && typeof newAnimal === 'string') {
@@ -133,14 +147,35 @@ app.post('/animal', (req, res) => {
 
 app.post('/stop', (_req, res) => {
   res.json({ ok: true });
-  setTimeout(() => process.exit(0), 100);
+  setTimeout(() => cleanup(0), 100);
 });
+
+// ── Lifecycle ─────────────────────────────────────────────────────────────────
+
+async function cleanup(code = 0) {
+  try {
+    await unregisterSession(SESSION_ID);
+  } catch { /* best-effort */ }
+  process.exit(code);
+}
+
+process.on('SIGTERM', () => cleanup(0));
+process.on('SIGINT',  () => cleanup(0));
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 
-app.listen(HTTP_PORT, () => {
+app.listen(HTTP_PORT, async () => {
+  // Register in the session registry so hooks can find this daemon
+  await registerSession({
+    sessionId: SESSION_ID,
+    daemonPort: HTTP_PORT,
+    wsPort:     WS_PORT,
+    pid:        process.pid,
+    startedAt:  new Date().toISOString(),
+    animal,
+  });
+
   process.stderr.write(
-    `[heyclaude] daemon running · animal=${animal} · http=:${HTTP_PORT} · ws=:${WS_PORT}\n` +
-    `[heyclaude] web UI at http://localhost:${HTTP_PORT}\n`
+    `[heyclaude] daemon · session=${SESSION_ID.slice(0, 8)} · animal=${animal} · http=:${HTTP_PORT} · ws=:${WS_PORT}\n`
   );
 });

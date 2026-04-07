@@ -153,10 +153,11 @@ cp    "$SCRIPT_DIR/bin/heyclaude.js" "$PLUGIN_DIR/bin/"
 chmod +x "$PLUGIN_DIR/bin/heyclaude.js"
 
 # Copy hooks
-cp "$SCRIPT_DIR/hooks/hooks.json"   "$PLUGIN_DIR/hooks/"
-cp "$SCRIPT_DIR/hooks/pre-tool.js"  "$PLUGIN_DIR/hooks/"
-cp "$SCRIPT_DIR/hooks/post-tool.js" "$PLUGIN_DIR/hooks/"
-cp "$SCRIPT_DIR/hooks/prompt.js"    "$PLUGIN_DIR/hooks/"
+cp "$SCRIPT_DIR/hooks/hooks.json"        "$PLUGIN_DIR/hooks/"
+cp "$SCRIPT_DIR/hooks/pre-tool.js"       "$PLUGIN_DIR/hooks/"
+cp "$SCRIPT_DIR/hooks/post-tool.js"      "$PLUGIN_DIR/hooks/"
+cp "$SCRIPT_DIR/hooks/prompt.js"         "$PLUGIN_DIR/hooks/"
+cp "$SCRIPT_DIR/hooks/session-helper.js" "$PLUGIN_DIR/hooks/"
 success "Files copied to plugin dir"
 
 # Write plugin manifest
