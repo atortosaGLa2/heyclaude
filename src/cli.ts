@@ -149,7 +149,18 @@ async function getSessionId(): Promise<string> {
   // Explicit override
   if (typeof flags['session-id'] === 'string') return flags['session-id'];
 
-  const { resolveSessionId } = await import('./session-resolver.js');
+  const { findClaudePid, sessionIdFromClaudePid, resolveSessionId } = await import('./session-resolver.js');
+
+  // Prefer process tree walk — always fresh, never stale from TTY map.
+  // The TTY map can hold an old session ID if the user started a new Claude
+  // session in the same terminal, causing the same animal to appear every time.
+  const claudePid = findClaudePid();
+  if (claudePid) {
+    const id = sessionIdFromClaudePid(claudePid);
+    if (id) return id;
+  }
+
+  // Fallback: TTY lookup → null → 'default'
   return resolveSessionId() ?? 'default';
 }
 
