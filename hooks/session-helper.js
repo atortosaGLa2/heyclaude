@@ -90,7 +90,11 @@ function readTtyMap() {
 }
 
 function getCurrentTty() {
-  try { return readlinkSync('/proc/self/fd/0'); } catch { return null; }
+  try {
+    const tty = readlinkSync('/proc/self/fd/0');
+    if (tty.startsWith('/dev/pts/') || tty.startsWith('/dev/tty')) return tty;
+    return null;
+  } catch { return null; }
 }
 
 // ── Public export ─────────────────────────────────────────────────────────────

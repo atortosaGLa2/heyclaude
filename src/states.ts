@@ -24,6 +24,7 @@ export function hookEventToState(event: string, toolName?: string): AnimationSta
   switch (event) {
     case 'PreToolUse':       return toolName ? toolToState(toolName) : 'thinking';
     case 'PostToolUse':      return 'success';
+    case 'error':            return 'error';
     case 'UserPromptSubmit': return 'thinking';
     case 'Stop':             return 'waiting';
     case 'PreCompact':       return 'thinking';

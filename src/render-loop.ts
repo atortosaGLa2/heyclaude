@@ -187,7 +187,7 @@ function connect() {
   });
 
   ws.on('error', () => {
-    if (!connected) setTimeout(connect, 2000);
+    // 'close' always fires after 'error' and handles reconnection
   });
 }
 

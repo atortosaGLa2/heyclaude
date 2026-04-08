@@ -144,9 +144,17 @@ export async function registerSession(entry: RegistryEntry): Promise<void> {
   await withRegistry((r) => { r[entry.sessionId] = entry; });
 }
 
-/** Remove a session entry. Called by daemon at exit. */
+/** Remove a session entry. Called by daemon at exit.
+ *  Also prunes any TTY map entries pointing to this session. */
 export async function unregisterSession(sessionId: string): Promise<void> {
   await withRegistry((r) => { delete r[sessionId]; });
+  // Clean up all TTY → sessionId entries for this session
+  const map = readTtyMapRaw();
+  let changed = false;
+  for (const [tty, sid] of Object.entries(map)) {
+    if (sid === sessionId) { delete map[tty]; changed = true; }
+  }
+  if (changed) writeTtyMap(map);
 }
 
 /** Fast lookup without locking. Returns null if session not found. */
