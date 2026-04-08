@@ -27,6 +27,8 @@ export interface RenderTheme {
   accent2: string;
   dim: string;
   text: string;
+  /** Temporary override for the border color (used during transition flashes). */
+  borderOverride?: string;
 }
 
 const DEFAULT_THEME: RenderTheme = {
@@ -189,12 +191,13 @@ export function renderUI(
 
   // ANSI theme colors — border color changes per state
   const cBg      = bg(t.bg);
-  const borderColor = state === 'waiting' ? '#ffaa44'
+  const borderColor = t.borderOverride
+    ?? (state === 'waiting' ? '#ffaa44'
     : state === 'error' ? '#ff4444'
     : state === 'success' ? '#22cc66'
     : state === 'coding' ? t.accent2
     : state === 'executing' ? '#ffaa22'
-    : t.dim;
+    : t.dim);
   const cBorder  = fg(borderColor);
   const cAccent1 = fg(t.accent1);
   const cAccent2 = fg(t.accent2);
